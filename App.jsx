@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect } from "react";
-import Admin, { saveOrder, applyAdminImages } from "./Admin.jsx";
+import Admin, { saveOrder, applyAdminCatalog, findCoupon, couponValue } from "./Admin.jsx";
 
 const PRODUCTS = [
   { id: 1, name: "Aura Wireless Headphones", img: "headphones", cat: "Audio", price: 12990, rating: 4.8, tag: "Best seller" },
@@ -40,7 +40,7 @@ const SLIDES = [
   { image: "https://loremflickr.com/1600/900/fashion?lock=204", l1: "স্টাইল যখন", l2: "আপনার পরিচয়", text: "Sneakers, jackets, bags and fragrances picked for the season.", cta: "Shop fashion", cat: "Fashion" },
   { image: "https://loremflickr.com/1600/900/camera?lock=205", l1: "প্রতিটি মুহূর্ত", l2: "ক্যামেরায় বন্দি করুন", text: "Mirrorless cameras and 4K drones for creators of every level.", cta: "Shop cameras", cat: "Cameras" },
 ];
-applyAdminImages(PRODUCTS); // photos added in the admin panel
+applyAdminCatalog(PRODUCTS, SLIDES, CATS); // products, categories, photos and hero slides saved in the admin panel
 // Product photos: put them in  public/products/  named like  headphones.jpg  (main) and headphones-2.jpg, -3.jpg, -4.jpg (gallery).
 // Run  node get-images.mjs YOUR_PEXELS_KEY  to download matching photos automatically.
 // If a local photo is missing, a random online photo is used, and if that also fails the icon shows.
@@ -557,13 +557,13 @@ function CheckoutPage({ user, cart, onBack, onPlaced }) {
   const [ship, setShip] = useState("standard");
   const [pay, setPay] = useState("card");
   const [promo, setPromo] = useState("");
-  const [applied, setApplied] = useState(false);
+  const [applied, setApplied] = useState(null);
   const [err, setErr] = useState({});
   const [order, setOrder] = useState(null);
 
   const sub = cart.reduce((s, i) => s + i.qty * i.price, 0);
   const count = cart.reduce((s, i) => s + i.qty, 0);
-  const discount = applied ? Math.round(sub * 15) / 100 : 0;
+  const discount = applied ? couponValue(applied, sub) : 0;
   const shipping = ship === "express" ? 250 : sub - discount > 5000 ? 0 : 100;
   const total = sub - discount + shipping;
 
@@ -579,7 +579,8 @@ function CheckoutPage({ user, cart, onBack, onPlaced }) {
   );
 
   const applyPromo = () => {
-    if (promo.trim().toUpperCase() === "EVERSTYLE15") setApplied(true);
+    const cp = findCoupon(promo, sub);
+    if (cp) setApplied(cp);
     else { setApplied(false); setErr({ ...err, promo: "x" }); }
   };
 
@@ -603,7 +604,7 @@ function CheckoutPage({ user, cart, onBack, onPlaced }) {
     }
     const oid = "NV-" + Math.random().toString(36).slice(2, 8).toUpperCase();
     setOrder({ id: oid, email: f.email, total, pay });
-    saveOrder({ id: oid, name: `${f.first} ${f.last}`.trim(), phone: f.phone, email: f.email, address: `${f.address}, ${f.city} ${f.zip}, ${f.country}`, items: cart.map((i) => ({ name: i.name, qty: i.qty, price: i.price })), total, pay: pay === "cod" ? "Cash on delivery" : "Card", status: "Pending", ts: new Date().toISOString() });
+    saveOrder({ id: oid, name: `${f.first} ${f.last}`.trim(), phone: f.phone, email: f.email, address: `${f.address}, ${f.city} ${f.zip}, ${f.country}`, items: cart.map((i) => ({ name: i.name, qty: i.qty, price: i.price })), total, pay: pay === "cod" ? "Cash on delivery" : "Card", status: "Pending", coupon: applied ? applied.code : null, discount, ts: new Date().toISOString() });
     onPlaced();
     window.scrollTo(0, 0);
   };
@@ -709,9 +710,9 @@ function CheckoutPage({ user, cart, onBack, onPlaced }) {
             <input value={promo} onChange={(e) => { setPromo(e.target.value); setApplied(false); setErr({ ...err, promo: "" }); }} placeholder="Promo code" aria-label="Promo code" />
             <button type="button" onClick={applyPromo}>Apply</button>
           </div>
-          {err.promo && <p className="note" style={{ color: "#C0503F", marginTop: "-.5rem" }}>That code isn't valid. Try EVERSTYLE15.</p>}
+          {err.promo && <p className="note" style={{ color: "#C0503F", marginTop: "-.5rem" }}>That code isn't valid, has expired, or needs a bigger order.</p>}
           <div className="row"><span>Subtotal</span><span>{money2(sub)}</span></div>
-          {applied && <div className="row green"><span>Promo (15%)</span><span>−{money2(discount)}</span></div>}
+          {applied && <div className="row green"><span>Promo ({applied.code})</span><span>−{money2(discount)}</span></div>}
           <div className="row"><span>Shipping</span><span>{shipping === 0 ? "Free" : money2(shipping)}</span></div>
           <div className="row total"><span>Total</span><span>{money2(total)}</span></div>
           <button type="submit" className="btn btn-primary place">{pay === "cod" ? "Place order" : `Pay ${money2(total)}`}</button>
@@ -1119,7 +1120,7 @@ export default function App() {
           onBuy={(p, q) => { add(p, q); setView("checkout"); window.scrollTo(0, 0); }}
         />
       ) : view === "admin" ? (
-        <Admin products={PRODUCTS} cats={CATS} onBack={() => { try { window.history.replaceState(null, "", "/"); } catch {} setView("shop"); window.scrollTo(0, 0); }} />
+        <Admin products={PRODUCTS} cats={CATS} slides={SLIDES} onBack={() => { try { window.history.replaceState(null, "", "/"); } catch {} setView("shop"); window.scrollTo(0, 0); }} />
       ) : view === "login" ? (
         <AuthPage onAuth={signIn} onBack={() => { setView("shop"); window.scrollTo(0, 0); }} />
       ) : view === "checkout" ? (
