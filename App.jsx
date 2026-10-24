@@ -540,6 +540,14 @@ footer{background:#17392B;color:var(--muted)}
 .opt:has(input:checked){background:rgba(31,74,56,.08)}
 .fld.bad input,.fld.bad select{border-color:#C0503F}
 .fld small{color:#C0503F}
+@media (min-width:901px){
+.hero{padding-bottom:1.5rem}
+.hero-card{min-height:clamp(340px,46vh,420px)}
+.hero h1{font-size:clamp(2rem,3.6vw,3.2rem);line-height:1.15}
+.hero-copy{padding:2rem clamp(2rem,4vw,3.5rem) 4rem;max-width:640px}
+.hero-copy p{margin:.8rem 0 1.2rem;font-size:1rem}
+.hero-copy .stats{margin-top:1.2rem}
+}
 `;
 
 const money2 = money;
