@@ -482,8 +482,8 @@ export function couponValue(coupon, subtotal = 0) {
 
 export function applyAdminCatalog(
   products,
-  slides,
-  cats
+  cats,
+  slides
 ) {
   try {
     const data = getStored();
@@ -4874,9 +4874,13 @@ function Panel({
 
   useEffect(() => {
     if (!me || !me.active) {
+      try {
+        sessionStorage.removeItem(OK);
+      } catch {}
+
       logout();
     }
-  }, [me, logout]);
+  }, [me?.id, me?.active]);
 
   useEffect(() => {
     const ok = saveStored(data);
@@ -4884,7 +4888,17 @@ function Panel({
     setStorageWarning(!ok);
   }, [data]);
 
-  if (!me) return null;
+  if (!me || !me.active) {
+    return (
+      <div className="ad-session-repair">
+        <div className="ad-session-repair-card">
+          <span className="ad-session-spinner" />
+          <b>Restoring admin session...</b>
+          <small>Please wait a moment.</small>
+        </div>
+      </div>
+    );
+  }
 
   const currentPage =
     allowed.includes(page)
@@ -7963,6 +7977,48 @@ textarea.ad-input{
   bottom:20px;
   color:#A1A9A4;
   font-size:7px;
+}
+
+/* ---------- SESSION REPAIR ---------- */
+
+.ad-session-repair{
+  min-height:100vh;
+  display:grid;
+  place-items:center;
+  padding:24px;
+  background:#F8F7F1;
+}
+
+.ad-session-repair-card{
+  min-width:260px;
+  padding:28px;
+  border:1px solid var(--border);
+  border-radius:18px;
+  background:#fff;
+  display:grid;
+  justify-items:center;
+  gap:8px;
+  color:var(--green);
+  box-shadow:0 18px 50px rgba(23,57,43,.08);
+}
+
+.ad-session-repair-card small{
+  color:#929C95;
+  font-size:8px;
+}
+
+.ad-session-spinner{
+  width:34px;
+  height:34px;
+  margin-bottom:5px;
+  border:3px solid #E6ECE8;
+  border-top-color:var(--green);
+  border-radius:50%;
+  animation:adSessionSpin .75s linear infinite;
+}
+
+@keyframes adSessionSpin{
+  to{transform:rotate(360deg)}
 }
 
 /* ---------- RESPONSIVE ---------- */
