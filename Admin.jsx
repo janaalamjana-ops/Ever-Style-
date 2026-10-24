@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { Component, useEffect, useMemo, useState } from "react";
 
 /* ============================================================
    EVER STYLE — PREMIUM ADMIN
@@ -4865,8 +4865,10 @@ function Panel({
   const [storageWarning, setStorageWarning] =
     useState(false);
 
-  const me = data.team.find(
-    (x) => x.id === meId
+  const team = Array.isArray(data?.team) ? data.team : [];
+
+  const me = team.find(
+    (x) => String(x.id) === String(meId)
   );
 
   const allowed =
@@ -5248,6 +5250,50 @@ function Panel({
   );
 }
 
+class AdminErrorBoundary extends Component {
+  constructor(props) {
+    super(props);
+    this.state = { error: null };
+  }
+
+  static getDerivedStateFromError(error) {
+    return { error };
+  }
+
+  componentDidCatch(error, info) {
+    console.error("Ever Style admin render error:", error, info);
+  }
+
+  resetAdmin = () => {
+    try {
+      sessionStorage.removeItem(OK);
+      localStorage.removeItem(KEY);
+    } catch {}
+    window.location.hash = "admin";
+    window.location.reload();
+  };
+
+  render() {
+    if (!this.state.error) return this.props.children;
+
+    return (
+      <div className="ad-session-repair">
+        <div className="ad-session-repair-card">
+          <b>Admin panel needs a reset</b>
+          <small>{String(this.state.error?.message || "Unknown admin error")}</small>
+          <button
+            type="button"
+            className="ad-btn ad-btn-primary"
+            onClick={this.resetAdmin}
+          >
+            Reset admin & reload
+          </button>
+        </div>
+      </div>
+    );
+  }
+}
+
 /* ============================================================
    ADMIN LOGIN
 ============================================================ */
@@ -5258,18 +5304,8 @@ export default function Admin({
   slides = [],
   onBack = () => {},
 }) {
-  const [meId, setMeId] =
-    useState(() => {
-      try {
-        return (
-          sessionStorage.getItem(
-            OK
-          ) || ""
-        );
-      } catch {
-        return "";
-      }
-    });
+  const [meId, setMeId] = useState("");
+  const [sessionReady, setSessionReady] = useState(false);
 
   const [email, setEmail] =
     useState("");
@@ -5284,15 +5320,35 @@ export default function Admin({
     useState(false);
 
   useEffect(() => {
-    const data = readData(
-      products,
-      cats,
-      slides
+    const data = repairOwner(
+      readData(products, cats, slides)
     );
 
-    saveStored(
-      repairOwner(data)
-    );
+    saveStored(data);
+
+    let savedId = "";
+    try {
+      savedId = sessionStorage.getItem(OK) || "";
+    } catch {}
+
+    const validUser = Array.isArray(data.team)
+      ? data.team.find(
+          (user) =>
+            String(user.id) === String(savedId) &&
+            user.active !== false
+        )
+      : null;
+
+    if (validUser) {
+      setMeId(validUser.id);
+    } else {
+      try {
+        sessionStorage.removeItem(OK);
+      } catch {}
+      setMeId("");
+    }
+
+    setSessionReady(true);
   }, [products, cats, slides]);
 
   const login = (e) => {
@@ -5375,15 +5431,25 @@ export default function Admin({
     <>
       <style>{ADMIN_CSS}</style>
 
-      {meId ? (
-        <Panel
-          products={products}
-          cats={cats}
-          slides={slides}
-          meId={meId}
-          onBack={onBack}
-          logout={logout}
-        />
+      {!sessionReady ? (
+        <div className="ad-session-repair">
+          <div className="ad-session-repair-card">
+            <span className="ad-session-spinner" />
+            <b>Loading admin...</b>
+            <small>Checking your admin session.</small>
+          </div>
+        </div>
+      ) : meId ? (
+        <AdminErrorBoundary>
+          <Panel
+            products={products}
+            cats={cats}
+            slides={slides}
+            meId={meId}
+            onBack={onBack}
+            logout={logout}
+          />
+        </AdminErrorBoundary>
       ) : (
         <div className="ad-login">
           <div className="ad-login-decoration ad-dec-1" />
