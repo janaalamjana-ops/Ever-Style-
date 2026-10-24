@@ -1,25 +1,19 @@
 import { useEffect, useMemo, useState } from "react";
 
 /* ============================================================
-   EVER STYLE — MODERN ADMIN PANEL
-   Front-end / localStorage demo version
-
-   OWNER LOGIN
-   Email: owner@everstyle.store
-   Password: mohonchura-admin
-
-   IMPORTANT:
-   For production, move authentication/data to a backend.
+   EVER STYLE — PREMIUM ADMIN
+   Theme matched with storefront:
+   Deep Forest Green + Champagne + Cream + White
 ============================================================ */
+
+const KEY = "mc_admin_v1";
+const OK = "mc_admin_ok";
 
 const ADMIN_EMAIL = "owner@everstyle.store";
 const ADMIN_PASS = "mohonchura-admin";
+const LOW = 5;
 
-const KEY = "ever_style_admin_v3";
-const SESSION_KEY = "ever_style_admin_session_v3";
-const LOW_STOCK = 5;
-
-const ORDER_STATUSES = [
+const STATUSES = [
   "Pending",
   "Processing",
   "Shipped",
@@ -27,41 +21,8 @@ const ORDER_STATUSES = [
   "Cancelled",
 ];
 
-const NAV = [
-  { id: "dashboard", label: "Dashboard", icon: "▦", group: "Overview" },
-
-  { id: "orders", label: "Orders", icon: "◫", group: "Commerce" },
-  { id: "products", label: "Products", icon: "◇", group: "Commerce" },
-  { id: "inventory", label: "Inventory", icon: "▤", group: "Commerce" },
-  { id: "categories", label: "Categories", icon: "⌘", group: "Commerce" },
-
-  { id: "customers", label: "Customers", icon: "◎", group: "Customers" },
-  { id: "reviews", label: "Reviews", icon: "★", group: "Customers" },
-
-  { id: "hero", label: "Hero / Banners", icon: "▧", group: "Marketing" },
-  { id: "coupons", label: "Coupons", icon: "%", group: "Marketing" },
-
-  { id: "team", label: "Team Access", icon: "♙", group: "System" },
-  { id: "audit", label: "Audit Log", icon: "◷", group: "System" },
-];
-
-const ALL_TABS = NAV.map((x) => x.id);
-
-const ROLES = {
-  Owner: ALL_TABS,
-  Manager: ALL_TABS.filter((x) => x !== "team"),
-  Support: ["dashboard", "orders", "customers", "reviews"],
-  Editor: [
-    "dashboard",
-    "products",
-    "inventory",
-    "categories",
-    "hero",
-  ],
-};
-
 const OWNER = {
-  id: "OWNER-1",
+  id: "U1",
   name: "Owner",
   email: ADMIN_EMAIL,
   role: "Owner",
@@ -69,459 +30,144 @@ const OWNER = {
   active: true,
 };
 
-const money = (value = 0) =>
-  `৳${Number(value || 0).toLocaleString("en-BD")}`;
+const NAV = [
+  ["dashboard", "Dashboard", "⌂", "Overview"],
+  ["orders", "Orders", "▣", "Commerce"],
+  ["products", "Products", "◇", "Commerce"],
+  ["inventory", "Inventory", "▤", "Commerce"],
+  ["categories", "Categories", "⌘", "Commerce"],
+  ["customers", "Customers", "◎", "Customers"],
+  ["reviews", "Reviews", "★", "Customers"],
+  ["hero", "Hero & Banners", "▧", "Marketing"],
+  ["coupons", "Coupons", "%", "Marketing"],
+  ["team", "Team Access", "♙", "System"],
+  ["audit", "Audit Log", "◷", "System"],
+];
+
+const PERMISSIONS = {
+  Owner: NAV.map((x) => x[0]),
+
+  Manager: [
+    "dashboard",
+    "orders",
+    "products",
+    "inventory",
+    "categories",
+    "customers",
+    "reviews",
+    "hero",
+    "coupons",
+    "audit",
+  ],
+
+  Editor: [
+    "dashboard",
+    "products",
+    "inventory",
+    "categories",
+    "reviews",
+    "hero",
+  ],
+
+  Support: [
+    "dashboard",
+    "orders",
+    "customers",
+    "reviews",
+  ],
+};
+
+/* ============================================================
+   HELPERS
+============================================================ */
 
 const uid = (prefix = "ID") =>
   `${prefix}-${Date.now().toString(36)}-${Math.random()
     .toString(36)
-    .slice(2, 6)
-    .toUpperCase()}`;
+    .slice(2, 7)}`;
 
-const now = () => new Date().toISOString();
+const money = (n = 0) =>
+  `৳${Number(n || 0).toLocaleString("en-BD")}`;
 
-const ago = (hours) =>
-  new Date(Date.now() - hours * 60 * 60 * 1000).toISOString();
+const dateText = (value) => {
+  if (!value) return "—";
 
-const formatDate = (date) => {
-  if (!date) return "—";
-
-  return new Date(date).toLocaleString("en-GB", {
-    day: "2-digit",
-    month: "short",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
+  try {
+    return new Date(value).toLocaleString("en-GB", {
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  } catch {
+    return value;
+  }
 };
 
-const logEntry = (action, detail, who = "Admin") => ({
-  id: uid("LOG"),
-  action,
-  detail,
-  who,
-  time: now(),
-});
+const todayISO = () => new Date().toISOString();
 
-/* ============================================================
-   DEFAULT DATA
-============================================================ */
-
-const DEFAULT_COUPONS = [
-  {
-    id: "COUPON-1",
-    code: "EVERSTYLE15",
-    type: "pct",
-    value: 15,
-    min: 0,
-    expires: "",
-    limit: 0,
-    used: 0,
-    active: true,
-  },
-  {
-    id: "COUPON-2",
-    code: "WELCOME200",
-    type: "flat",
-    value: 200,
-    min: 2000,
-    expires: "",
-    limit: 100,
-    used: 0,
-    active: true,
-  },
-];
-
-function createSeed(products = [], cats = [], slides = []) {
-  const subCategories = {
-    Audio: ["Headphones", "Speakers"],
-    Fashion: ["Shoes", "Bags"],
-    Tech: ["Laptop", "Phone"],
-  };
-
+function logItem(action, detail, who = "System") {
   return {
-    categories: cats
-      .filter((x) => x !== "All")
-      .map((name, index) => ({
-        id: `CAT-${index}`,
-        name,
-        subs: subCategories[name] || [],
-      })),
-
-    products: products.map((product, index) => ({
-      id: product.id ?? uid("P"),
-      name: product.name || "Unnamed product",
-      sku:
-        product.sku ||
-        `ES-${String(index + 1).padStart(4, "0")}`,
-      category: product.cat || "",
-      subcategory: "",
-      price: Number(product.price || 0),
-      stock: product.stock ?? 10,
-      low: LOW_STOCK,
-      tag: product.tag || "",
-      active: true,
-      images: product.images || (product.image ? [product.image] : []),
-    })),
-
-    orders: [
-      {
-        id: "ES-4F2K9A",
-        name: "Rafi Ahmed",
-        phone: "01711000001",
-        email: "",
-        address: "Dhanmondi, Dhaka",
-        items: [
-          {
-            name: "Aura Wireless Headphones",
-            qty: 1,
-            price: 12990,
-          },
-        ],
-        total: 12990,
-        payment: "Card",
-        status: "Pending",
-        time: ago(3),
-      },
-      {
-        id: "ES-7B1Q3C",
-        name: "Nusrat Jahan",
-        phone: "01811000002",
-        email: "",
-        address: "Agrabad, Chattogram",
-        items: [
-          {
-            name: "Velo Runner Sneakers",
-            qty: 2,
-            price: 5490,
-          },
-        ],
-        total: 10980,
-        payment: "Cash on delivery",
-        status: "Processing",
-        time: ago(20),
-      },
-      {
-        id: "ES-2D8M5X",
-        name: "Tanvir Hasan",
-        phone: "01911000003",
-        email: "",
-        address: "Sylhet",
-        items: [
-          {
-            name: "Zen Mechanical Keyboard",
-            qty: 1,
-            price: 6990,
-          },
-        ],
-        total: 6990,
-        payment: "Card",
-        status: "Shipped",
-        time: ago(50),
-      },
-    ],
-
-    reviews: [
-      {
-        id: "REV-1",
-        product: "Aura Wireless Headphones",
-        author: "Rafi Ahmed",
-        rating: 5,
-        text: "Excellent quality and fast delivery.",
-        status: "Approved",
-        time: ago(50),
-      },
-      {
-        id: "REV-2",
-        product: "Velo Runner Sneakers",
-        author: "Nusrat Jahan",
-        rating: 4,
-        text: "Very nice product. Packaging was good.",
-        status: "Pending",
-        time: ago(10),
-      },
-    ],
-
-    hero: slides.map((slide) => ({
-      id: uid("HERO"),
-      image: slide.image || "",
-      title: slide.l1 || "",
-      title2: slide.l2 || "",
-      description: slide.text || "",
-      cta: slide.cta || "Shop now",
-      category: slide.cat || "All",
-      active: true,
-    })),
-
-    coupons: DEFAULT_COUPONS,
-
-    team: [{ ...OWNER }],
-
-    logs: [
-      logEntry(
-        "Admin initialized",
-        "Admin panel data created.",
-        "System"
-      ),
-    ],
+    id: uid("LOG"),
+    action,
+    detail,
+    who,
+    time: todayISO(),
   };
 }
 
-/* ============================================================
-   STORAGE
-============================================================ */
+function safeParse(value, fallback = null) {
+  try {
+    return JSON.parse(value);
+  } catch {
+    return fallback;
+  }
+}
 
 function getStored() {
+  if (typeof window === "undefined") return null;
+
+  return safeParse(localStorage.getItem(KEY), null);
+}
+
+function saveStored(data) {
   try {
-    return JSON.parse(localStorage.getItem(KEY)) || null;
+    localStorage.setItem(KEY, JSON.stringify(data));
+    return true;
   } catch {
-    return null;
+    return false;
   }
-}
-
-function ensureOwner(data) {
-  if (!data) return data;
-
-  let team = Array.isArray(data.team) ? [...data.team] : [];
-
-  const index = team.findIndex(
-    (user) =>
-      user.id === OWNER.id ||
-      String(user.email || "").toLowerCase() ===
-        ADMIN_EMAIL.toLowerCase()
-  );
-
-  if (index === -1) {
-    team.unshift({ ...OWNER });
-  } else {
-    team[index] = {
-      ...team[index],
-      id: OWNER.id,
-      email: ADMIN_EMAIL,
-      role: "Owner",
-      pass: ADMIN_PASS,
-      active: true,
-    };
-  }
-
-  return { ...data, team };
-}
-
-function loadData(products, cats, slides) {
-  const seed = createSeed(products, cats, slides);
-  const saved = getStored();
-
-  if (!saved) {
-    const data = ensureOwner(seed);
-
-    try {
-      localStorage.setItem(KEY, JSON.stringify(data));
-    } catch {}
-
-    return data;
-  }
-
-  const data = ensureOwner({
-    ...seed,
-    ...saved,
-
-    products: Array.isArray(saved.products)
-      ? saved.products
-      : seed.products,
-
-    categories: Array.isArray(saved.categories)
-      ? saved.categories
-      : seed.categories,
-
-    orders: Array.isArray(saved.orders)
-      ? saved.orders
-      : seed.orders,
-
-    reviews: Array.isArray(saved.reviews)
-      ? saved.reviews
-      : seed.reviews,
-
-    hero: Array.isArray(saved.hero) ? saved.hero : seed.hero,
-
-    coupons: Array.isArray(saved.coupons)
-      ? saved.coupons
-      : seed.coupons,
-
-    team: Array.isArray(saved.team) ? saved.team : seed.team,
-
-    logs: Array.isArray(saved.logs) ? saved.logs : seed.logs,
-  });
-
-  try {
-    localStorage.setItem(KEY, JSON.stringify(data));
-  } catch {}
-
-  return data;
 }
 
 /* ============================================================
-   STOREFRONT EXPORTS
+   IMAGE COMPRESSION
 ============================================================ */
 
-export function saveOrder(order) {
-  try {
-    const data = getStored() || {};
-
-    const nextOrder = {
-      ...order,
-      time: order.time || order.ts || now(),
-      payment: order.payment || order.pay || "Unknown",
-    };
-
-    data.orders = [nextOrder, ...(data.orders || [])];
-
-    if (order.coupon) {
-      data.coupons = (data.coupons || DEFAULT_COUPONS).map((c) =>
-        c.code === order.coupon
-          ? { ...c, used: (c.used || 0) + 1 }
-          : c
-      );
-    }
-
-    data.logs = [
-      logEntry(
-        "New order",
-        `${order.id} · ${money(order.total)}`,
-        "Customer"
-      ),
-      ...(data.logs || []),
-    ].slice(0, 500);
-
-    localStorage.setItem(KEY, JSON.stringify(data));
-  } catch {}
-}
-
-export function findCoupon(code, subtotal) {
-  const data = getStored();
-
-  const coupon = (data?.coupons || DEFAULT_COUPONS).find(
-    (item) =>
-      item.code.toUpperCase() ===
-      String(code || "").trim().toUpperCase()
-  );
-
-  if (!coupon || !coupon.active) return null;
-
-  if (
-    coupon.expires &&
-    new Date(`${coupon.expires}T23:59:59`) < new Date()
-  )
-    return null;
-
-  if (
-    coupon.limit &&
-    Number(coupon.used || 0) >= Number(coupon.limit)
-  )
-    return null;
-
-  if (subtotal < Number(coupon.min || 0)) return null;
-
-  return coupon;
-}
-
-export function couponValue(coupon, subtotal) {
-  if (!coupon) return 0;
-
-  if (coupon.type === "pct") {
-    return Math.round((subtotal * coupon.value) / 100);
-  }
-
-  return Math.min(Number(coupon.value || 0), subtotal);
-}
-
-export function applyAdminCatalog(products, slides, cats) {
-  try {
-    const data = getStored();
-    if (!data) return;
-
-    if (Array.isArray(data.products)) {
-      const next = [];
-
-      data.products.forEach((item) => {
-        if (item.active === false) return;
-
-        const original =
-          products.find((x) => x.id === item.id) || {
-            id: item.id,
-            rating: 4.5,
-          };
-
-        next.push({
-          ...original,
-          id: item.id,
-          name: item.name,
-          cat: item.category,
-          price: item.price,
-          tag: item.tag || undefined,
-          images: item.images || [],
-          image: item.images?.[0] || original.image,
-        });
-      });
-
-      products.splice(0, products.length, ...next);
-    }
-
-    if (Array.isArray(data.categories)) {
-      cats.splice(
-        0,
-        cats.length,
-        "All",
-        ...data.categories.map((x) => x.name)
-      );
-    }
-
-    if (Array.isArray(data.hero) && slides) {
-      slides.splice(
-        0,
-        slides.length,
-        ...data.hero
-          .filter((x) => x.active !== false && x.image)
-          .map((x) => ({
-            image: x.image,
-            l1: x.title,
-            l2: x.title2,
-            text: x.description,
-            cta: x.cta,
-            cat: x.category,
-          }))
-      );
-    }
-  } catch {}
-}
-
-/* ============================================================
-   IMAGE COMPRESS
-============================================================ */
-
-function compressImage(file, max = 1000, quality = 0.76) {
-  return new Promise((resolve) => {
-    if (!file) return resolve(null);
+function imageToDataURL(file, maxSize = 1200, quality = 0.78) {
+  return new Promise((resolve, reject) => {
+    if (!file) return resolve("");
 
     const reader = new FileReader();
 
     reader.onload = () => {
-      const image = new Image();
+      const img = new Image();
 
-      image.onload = () => {
-        const ratio = Math.min(
+      img.onload = () => {
+        const scale = Math.min(
           1,
-          max / Math.max(image.width, image.height)
+          maxSize / Math.max(img.width, img.height)
         );
 
         const canvas = document.createElement("canvas");
 
-        canvas.width = Math.round(image.width * ratio);
-        canvas.height = Math.round(image.height * ratio);
+        canvas.width = Math.round(img.width * scale);
+        canvas.height = Math.round(img.height * scale);
 
         const ctx = canvas.getContext("2d");
 
         ctx.drawImage(
-          image,
+          img,
           0,
           0,
           canvas.width,
@@ -531,93 +177,496 @@ function compressImage(file, max = 1000, quality = 0.76) {
         resolve(canvas.toDataURL("image/jpeg", quality));
       };
 
-      image.onerror = () => resolve(null);
-      image.src = reader.result;
+      img.onerror = reject;
+      img.src = reader.result;
     };
 
-    reader.onerror = () => resolve(null);
+    reader.onerror = reject;
     reader.readAsDataURL(file);
   });
+}
+
+/* ============================================================
+   INITIAL DATA
+============================================================ */
+
+function normalizeProduct(p, index = 0) {
+  const images =
+    Array.isArray(p.images) && p.images.length
+      ? p.images
+      : p.image
+      ? [p.image]
+      : [];
+
+  return {
+    id: p.id ?? uid("P"),
+    name: p.name || "Untitled product",
+    sku: p.sku || `ES-${String(index + 1).padStart(4, "0")}`,
+    category: p.category || p.cat || "",
+    subcategory: p.subcategory || "",
+    price: Number(p.price || 0),
+    stock: Number(p.stock ?? 10),
+    low: Number(p.low ?? LOW),
+    tag: p.tag || "",
+    active: p.active !== false,
+    images,
+    img: p.img || "",
+  };
+}
+
+function seed(products = [], cats = [], slides = []) {
+  const categoryList = cats
+    .filter((x) => x && x !== "All")
+    .map((name, index) => ({
+      id: `CAT-${index + 1}`,
+      name,
+      subs: [],
+    }));
+
+  return {
+    products: products.map(normalizeProduct),
+
+    categories: categoryList,
+
+    orders: [],
+
+    reviews: [],
+
+    hero: slides.map((slide, index) => ({
+      id: `HERO-${index + 1}`,
+      image: slide.image || "",
+      title: slide.l1 || "",
+      title2: slide.l2 || "",
+      description: slide.text || "",
+      cta: slide.cta || "Shop now",
+      category: slide.cat || "All",
+      active: true,
+    })),
+
+    coupons: [
+      {
+        id: "CP-1",
+        code: "WELCOME10",
+        type: "percent",
+        value: 10,
+        min: 0,
+        expires: "",
+        limit: 0,
+        used: 0,
+        active: true,
+      },
+    ],
+
+    team: [{ ...OWNER }],
+
+    logs: [
+      logItem(
+        "Admin initialized",
+        "Ever Style admin panel initialized.",
+        "System"
+      ),
+    ],
+  };
+}
+
+function repairOwner(data) {
+  let team = Array.isArray(data.team) ? [...data.team] : [];
+
+  const index = team.findIndex(
+    (u) =>
+      u.id === OWNER.id ||
+      String(u.email || "").toLowerCase() ===
+        ADMIN_EMAIL.toLowerCase()
+  );
+
+  if (index === -1) {
+    team.unshift({ ...OWNER });
+  } else {
+    team[index] = {
+      ...team[index],
+      id: OWNER.id,
+      name: team[index].name || "Owner",
+      email: ADMIN_EMAIL,
+      role: "Owner",
+      pass: ADMIN_PASS,
+      active: true,
+    };
+  }
+
+  return {
+    ...data,
+    team,
+  };
+}
+
+function readData(products, cats, slides) {
+  const fresh = seed(products, cats, slides);
+  const saved = getStored();
+
+  if (!saved) {
+    const data = repairOwner(fresh);
+    saveStored(data);
+    return data;
+  }
+
+  const merged = {
+    ...fresh,
+    ...saved,
+
+    products: Array.isArray(saved.products)
+      ? saved.products.map(normalizeProduct)
+      : fresh.products,
+
+    categories: Array.isArray(saved.categories)
+      ? saved.categories
+      : fresh.categories,
+
+    orders: Array.isArray(saved.orders)
+      ? saved.orders
+      : [],
+
+    reviews: Array.isArray(saved.reviews)
+      ? saved.reviews
+      : [],
+
+    hero: Array.isArray(saved.hero)
+      ? saved.hero
+      : fresh.hero,
+
+    coupons: Array.isArray(saved.coupons)
+      ? saved.coupons
+      : fresh.coupons,
+
+    team: Array.isArray(saved.team)
+      ? saved.team
+      : fresh.team,
+
+    logs: Array.isArray(saved.logs)
+      ? saved.logs
+      : fresh.logs,
+  };
+
+  const repaired = repairOwner(merged);
+
+  saveStored(repaired);
+
+  return repaired;
+}
+
+/* ============================================================
+   STOREFRONT HELPERS
+   Used by App.jsx
+============================================================ */
+
+export function saveOrder(order) {
+  const data = getStored() || {
+    orders: [],
+    coupons: [],
+    logs: [],
+  };
+
+  const newOrder = {
+    ...order,
+
+    id:
+      order.id ||
+      `ES-${Math.random()
+        .toString(36)
+        .slice(2, 8)
+        .toUpperCase()}`,
+
+    status: order.status || "Pending",
+
+    time:
+      order.time ||
+      order.ts ||
+      new Date().toISOString(),
+
+    payment:
+      order.payment ||
+      order.pay ||
+      "Cash on delivery",
+  };
+
+  data.orders = [
+    newOrder,
+    ...(Array.isArray(data.orders) ? data.orders : []),
+  ];
+
+  if (order.coupon) {
+    data.coupons = (data.coupons || []).map((c) =>
+      c.code === order.coupon
+        ? {
+            ...c,
+            used: Number(c.used || 0) + 1,
+          }
+        : c
+    );
+  }
+
+  data.logs = [
+    logItem(
+      "New order",
+      `${newOrder.id} · ${money(newOrder.total)}`,
+      "Customer"
+    ),
+    ...(data.logs || []),
+  ].slice(0, 500);
+
+  saveStored(data);
+
+  return newOrder;
+}
+
+export function findCoupon(code, subtotal = 0) {
+  const data = getStored();
+
+  const coupons = data?.coupons || [];
+
+  const normalized = String(code || "")
+    .trim()
+    .toUpperCase();
+
+  const coupon = coupons.find(
+    (x) =>
+      String(x.code || "").toUpperCase() === normalized
+  );
+
+  if (!coupon || coupon.active === false) return null;
+
+  if (
+    coupon.expires &&
+    new Date(`${coupon.expires}T23:59:59`) <
+      new Date()
+  ) {
+    return null;
+  }
+
+  if (
+    Number(coupon.limit || 0) > 0 &&
+    Number(coupon.used || 0) >=
+      Number(coupon.limit)
+  ) {
+    return null;
+  }
+
+  if (Number(subtotal) < Number(coupon.min || 0)) {
+    return null;
+  }
+
+  return coupon;
+}
+
+export function couponValue(coupon, subtotal = 0) {
+  if (!coupon) return 0;
+
+  if (
+    coupon.type === "percent" ||
+    coupon.type === "pct"
+  ) {
+    return Math.min(
+      Number(subtotal),
+      Math.round(
+        (Number(subtotal) *
+          Number(coupon.value || 0)) /
+          100
+      )
+    );
+  }
+
+  return Math.min(
+    Number(subtotal),
+    Number(coupon.value || 0)
+  );
+}
+
+export function applyAdminCatalog(
+  products,
+  slides,
+  cats
+) {
+  try {
+    const data = getStored();
+
+    if (!data) return;
+
+    if (
+      Array.isArray(products) &&
+      Array.isArray(data.products)
+    ) {
+      const nextProducts = data.products
+        .filter((x) => x.active !== false)
+        .map((item) => {
+          const original =
+            products.find(
+              (x) =>
+                String(x.id) === String(item.id)
+            ) || {};
+
+          return {
+            ...original,
+            id: item.id,
+            name: item.name,
+            cat: item.category,
+            price: Number(item.price || 0),
+            stock: Number(item.stock || 0),
+            tag: item.tag || undefined,
+            image:
+              item.images?.[0] ||
+              original.image,
+            images: item.images || [],
+            img: item.img || original.img,
+          };
+        });
+
+      products.splice(
+        0,
+        products.length,
+        ...nextProducts
+      );
+    }
+
+    if (
+      Array.isArray(cats) &&
+      Array.isArray(data.categories)
+    ) {
+      cats.splice(
+        0,
+        cats.length,
+        "All",
+        ...data.categories.map((x) => x.name)
+      );
+    }
+
+    if (
+      Array.isArray(slides) &&
+      Array.isArray(data.hero)
+    ) {
+      slides.splice(
+        0,
+        slides.length,
+        ...data.hero
+          .filter((x) => x.active !== false)
+          .map((x) => ({
+            image: x.image || "",
+            l1: x.title || "",
+            l2: x.title2 || "",
+            text: x.description || "",
+            cta: x.cta || "Shop now",
+            cat: x.category || "All",
+          }))
+      );
+    }
+  } catch (error) {
+    console.error("Admin catalog error:", error);
+  }
 }
 
 /* ============================================================
    REUSABLE UI
 ============================================================ */
 
-function Icon({ children }) {
-  return <span className="ea-icon">{children}</span>;
+function Status({ value }) {
+  const cls = String(value || "")
+    .toLowerCase()
+    .replace(/\s+/g, "-");
+
+  return (
+    <span className={`ad-status ad-${cls}`}>
+      <i />
+      {value}
+    </span>
+  );
 }
 
 function Field({ label, children }) {
   return (
-    <label className="ea-field">
+    <label className="ad-field">
       <span>{label}</span>
       {children}
     </label>
   );
 }
 
-function Status({ children }) {
-  const key = String(children || "")
-    .toLowerCase()
-    .replace(/\s/g, "-");
-
+function Empty({
+  icon = "◇",
+  title,
+  text,
+}) {
   return (
-    <span className={`ea-status status-${key}`}>
-      <i />
-      {children}
-    </span>
-  );
-}
-
-function Empty({ title, text }) {
-  return (
-    <div className="ea-empty">
-      <div className="ea-empty-icon">◇</div>
+    <div className="ad-empty">
+      <div>{icon}</div>
       <h3>{title}</h3>
       {text && <p>{text}</p>}
     </div>
   );
 }
 
-function Modal({ title, children, onClose, wide = false }) {
+function Modal({
+  title,
+  subtitle,
+  onClose,
+  children,
+  wide = false,
+}) {
   return (
     <div
-      className="ea-modal-bg"
+      className="ad-modal-backdrop"
       onMouseDown={(e) => {
-        if (e.target === e.currentTarget) onClose();
+        if (e.target === e.currentTarget)
+          onClose();
       }}
     >
-      <div className={`ea-modal ${wide ? "wide" : ""}`}>
-        <div className="ea-modal-head">
+      <section
+        className={`ad-modal ${
+          wide ? "ad-modal-wide" : ""
+        }`}
+      >
+        <header className="ad-modal-head">
           <div>
-            <span className="ea-eyebrow">Ever Style Admin</span>
+            <span>EVER STYLE ADMIN</span>
             <h2>{title}</h2>
+            {subtitle && <p>{subtitle}</p>}
           </div>
 
           <button
             type="button"
-            className="ea-close"
             onClick={onClose}
           >
             ×
           </button>
-        </div>
+        </header>
 
-        <div className="ea-modal-body">{children}</div>
-      </div>
+        <div className="ad-modal-content">
+          {children}
+        </div>
+      </section>
     </div>
   );
 }
 
+function Toggle({ value, onChange }) {
+  return (
+    <button
+      type="button"
+      className={`ad-toggle ${
+        value ? "on" : ""
+      }`}
+      onClick={() => onChange(!value)}
+    >
+      <span />
+    </button>
+  );
+}
+
 /* ============================================================
-   CUSTOMERS HELPER
+   CUSTOMER AGGREGATION
 ============================================================ */
 
-function getCustomers(data) {
+function buildCustomers(orders) {
   const map = {};
 
-  data.orders.forEach((order) => {
+  (orders || []).forEach((order) => {
     const key =
       order.phone ||
       order.email ||
@@ -625,20 +674,22 @@ function getCustomers(data) {
 
     if (!map[key]) {
       map[key] = {
-        key,
-        name: order.name,
-        phone: order.phone,
-        email: order.email,
-        address: order.address,
-        orders: [],
+        id: key,
+        name: order.name || "Customer",
+        phone: order.phone || "",
+        email: order.email || "",
+        address: order.address || "",
         spent: 0,
+        orders: [],
       };
     }
 
     map[key].orders.push(order);
 
     if (order.status !== "Cancelled") {
-      map[key].spent += Number(order.total || 0);
+      map[key].spent += Number(
+        order.total || 0
+      );
     }
   });
 
@@ -651,96 +702,127 @@ function getCustomers(data) {
    DASHBOARD
 ============================================================ */
 
-function Dashboard({ data, setTab }) {
-  const validOrders = data.orders.filter(
-    (x) => x.status !== "Cancelled"
+function Dashboard({ data, go }) {
+  const customers = useMemo(
+    () => buildCustomers(data.orders),
+    [data.orders]
   );
 
-  const revenue = validOrders.reduce(
-    (sum, order) => sum + Number(order.total || 0),
-    0
-  );
-
-  const customers = getCustomers(data);
-
-  const low = data.products.filter(
-    (x) => Number(x.stock) <= Number(x.low ?? LOW_STOCK)
-  );
+  const revenue = data.orders
+    .filter(
+      (x) => x.status !== "Cancelled"
+    )
+    .reduce(
+      (sum, x) =>
+        sum + Number(x.total || 0),
+      0
+    );
 
   const pending = data.orders.filter(
     (x) => x.status === "Pending"
   ).length;
 
+  const low = data.products.filter(
+    (x) =>
+      Number(x.stock || 0) <=
+      Number(x.low ?? LOW)
+  );
+
+  const approvedReviews =
+    data.reviews.filter(
+      (x) => x.status === "Approved"
+    ).length;
+
   const stats = [
     {
-      label: "Total revenue",
+      label: "Total Revenue",
       value: money(revenue),
+      note: "From active orders",
       icon: "৳",
-      tab: "orders",
-      note: "All non-cancelled orders",
+      target: "orders",
     },
     {
-      label: "Total orders",
+      label: "Orders",
       value: data.orders.length,
-      icon: "◫",
-      tab: "orders",
-      note: `${pending} waiting`,
+      note: `${pending} pending`,
+      icon: "▣",
+      target: "orders",
     },
     {
       label: "Customers",
       value: customers.length,
-      icon: "◎",
-      tab: "customers",
       note: "Unique customers",
+      icon: "◎",
+      target: "customers",
     },
     {
-      label: "Low stock",
+      label: "Low Stock",
       value: low.length,
-      icon: "!",
-      tab: "inventory",
       note: "Needs attention",
+      icon: "!",
+      target: "inventory",
     },
   ];
 
-  const days = Array.from({ length: 7 }, (_, index) => {
-    const date = new Date();
+  const chart = Array.from(
+    { length: 7 },
+    (_, i) => {
+      const date = new Date();
 
-    date.setDate(date.getDate() - (6 - index));
-
-    const value = validOrders
-      .filter(
-        (order) =>
-          new Date(order.time || order.ts).toDateString() ===
-          date.toDateString()
-      )
-      .reduce(
-        (sum, order) => sum + Number(order.total || 0),
-        0
+      date.setDate(
+        date.getDate() - (6 - i)
       );
 
-    return {
-      day: date.toLocaleDateString("en-GB", {
-        weekday: "short",
-      }),
-      value,
-    };
-  });
+      const amount = data.orders
+        .filter((order) => {
+          const d = new Date(
+            order.time || order.ts
+          );
 
-  const max = Math.max(...days.map((x) => x.value), 1);
+          return (
+            d.toDateString() ===
+              date.toDateString() &&
+            order.status !== "Cancelled"
+          );
+        })
+        .reduce(
+          (sum, x) =>
+            sum + Number(x.total || 0),
+          0
+        );
+
+      return {
+        label: date.toLocaleDateString(
+          "en-GB",
+          { weekday: "short" }
+        ),
+        amount,
+      };
+    }
+  );
+
+  const maxChart = Math.max(
+    ...chart.map((x) => x.amount),
+    1
+  );
 
   return (
-    <div className="ea-page">
-      <section className="ea-stats">
+    <div className="ad-stack">
+      <section className="ad-stats">
         {stats.map((item) => (
           <button
-            type="button"
             key={item.label}
-            className="ea-stat"
-            onClick={() => setTab(item.tab)}
+            className="ad-stat"
+            onClick={() => go(item.target)}
           >
-            <div className="ea-stat-top">
-              <span className="ea-stat-icon">{item.icon}</span>
-              <span className="ea-stat-arrow">↗</span>
+            <div className="ad-stat-top">
+              <span className="ad-stat-icon">
+                {item.icon}
+              </span>
+
+              <span className="ad-stat-arrow">
+                ↗
+              </span>
             </div>
 
             <strong>{item.value}</strong>
@@ -750,128 +832,270 @@ function Dashboard({ data, setTab }) {
         ))}
       </section>
 
-      <section className="ea-dashboard-grid">
-        <div className="ea-card ea-chart-card">
-          <div className="ea-card-head">
+      <section className="ad-dashboard-grid">
+        <article className="ad-card">
+          <div className="ad-card-head">
             <div>
-              <span className="ea-eyebrow">Performance</span>
+              <span className="ad-kicker">
+                PERFORMANCE
+              </span>
               <h2>Sales overview</h2>
             </div>
 
-            <span className="ea-soft-badge">Last 7 days</span>
+            <span className="ad-pill">
+              Last 7 days
+            </span>
           </div>
 
-          <div className="ea-chart">
-            {days.map((item) => (
-              <div className="ea-chart-col" key={item.day}>
-                <div className="ea-bar-space">
+          <div className="ad-chart">
+            {chart.map((x) => (
+              <div
+                className="ad-chart-item"
+                key={x.label}
+              >
+                <div className="ad-chart-space">
                   <div
-                    className="ea-chart-bar"
+                    className="ad-chart-bar"
                     style={{
                       height: `${Math.max(
-                        5,
-                        (item.value / max) * 100
+                        4,
+                        (x.amount /
+                          maxChart) *
+                          100
                       )}%`,
                     }}
-                    title={money(item.value)}
+                    title={money(x.amount)}
                   />
                 </div>
 
-                <span>{item.day}</span>
+                <span>{x.label}</span>
               </div>
             ))}
           </div>
-        </div>
+        </article>
 
-        <div className="ea-card">
-          <div className="ea-card-head">
+        <article className="ad-card">
+          <div className="ad-card-head">
             <div>
-              <span className="ea-eyebrow">Orders</span>
-              <h2>Recent orders</h2>
+              <span className="ad-kicker">
+                ACTIVITY
+              </span>
+              <h2>Store overview</h2>
             </div>
+          </div>
+
+          <div className="ad-overview-list">
+            <button
+              onClick={() => go("products")}
+            >
+              <span>
+                <i>◇</i>
+                Products
+              </span>
+              <b>{data.products.length}</b>
+            </button>
 
             <button
-              className="ea-text-btn"
-              onClick={() => setTab("orders")}
+              onClick={() => go("reviews")}
             >
-              View all →
+              <span>
+                <i>★</i>
+                Approved reviews
+              </span>
+              <b>{approvedReviews}</b>
+            </button>
+
+            <button
+              onClick={() => go("coupons")}
+            >
+              <span>
+                <i>%</i>
+                Active coupons
+              </span>
+              <b>
+                {
+                  data.coupons.filter(
+                    (x) => x.active
+                  ).length
+                }
+              </b>
+            </button>
+
+            <button
+              onClick={() => go("hero")}
+            >
+              <span>
+                <i>▧</i>
+                Hero banners
+              </span>
+              <b>{data.hero.length}</b>
             </button>
           </div>
-
-          <div className="ea-mini-list">
-            {data.orders.slice(0, 5).map((order) => (
-              <div className="ea-mini-order" key={order.id}>
-                <div className="ea-avatar">
-                  {order.name?.[0]?.toUpperCase() || "C"}
-                </div>
-
-                <div className="ea-mini-main">
-                  <b>{order.name}</b>
-                  <span>{order.id}</span>
-                </div>
-
-                <div className="ea-mini-right">
-                  <b>{money(order.total)}</b>
-                  <Status>{order.status}</Status>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
+        </article>
       </section>
 
-      <section className="ea-card">
-        <div className="ea-card-head">
+      <section className="ad-card">
+        <div className="ad-card-head">
           <div>
-            <span className="ea-eyebrow">Inventory</span>
+            <span className="ad-kicker">
+              RECENT
+            </span>
+            <h2>Latest orders</h2>
+          </div>
+
+          <button
+            className="ad-link"
+            onClick={() => go("orders")}
+          >
+            View all →
+          </button>
+        </div>
+
+        {data.orders.length ? (
+          <div className="ad-table-wrap">
+            <table className="ad-table">
+              <thead>
+                <tr>
+                  <th>Order</th>
+                  <th>Customer</th>
+                  <th>Total</th>
+                  <th>Status</th>
+                  <th>Date</th>
+                </tr>
+              </thead>
+
+              <tbody>
+                {data.orders
+                  .slice(0, 6)
+                  .map((order) => (
+                    <tr key={order.id}>
+                      <td>
+                        <b>{order.id}</b>
+                      </td>
+
+                      <td>
+                        <b>
+                          {order.name ||
+                            "Customer"}
+                        </b>
+                        <small>
+                          {order.phone ||
+                            order.email}
+                        </small>
+                      </td>
+
+                      <td>
+                        <b>
+                          {money(
+                            order.total
+                          )}
+                        </b>
+                      </td>
+
+                      <td>
+                        <Status
+                          value={
+                            order.status
+                          }
+                        />
+                      </td>
+
+                      <td>
+                        {dateText(
+                          order.time ||
+                            order.ts
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <Empty
+            icon="▣"
+            title="No orders yet"
+            text="New customer orders will appear here."
+          />
+        )}
+      </section>
+
+      <section className="ad-card">
+        <div className="ad-card-head">
+          <div>
+            <span className="ad-kicker">
+              INVENTORY
+            </span>
             <h2>Stock attention</h2>
           </div>
 
           <button
-            className="ea-text-btn"
-            onClick={() => setTab("inventory")}
+            className="ad-link"
+            onClick={() =>
+              go("inventory")
+            }
           >
-            Manage inventory →
+            Manage stock →
           </button>
         </div>
 
-        {low.length === 0 ? (
-          <Empty
-            title="Stock looks good"
-            text="There are no low-stock products."
-          />
-        ) : (
-          <div className="ea-table-wrap">
-            <table className="ea-table">
+        {low.length ? (
+          <div className="ad-table-wrap">
+            <table className="ad-table">
               <thead>
                 <tr>
                   <th>Product</th>
                   <th>SKU</th>
                   <th>Category</th>
                   <th>Stock</th>
+                  <th>Status</th>
                 </tr>
               </thead>
 
               <tbody>
-                {low.slice(0, 6).map((product) => (
-                  <tr key={product.id}>
-                    <td>
-                      <b>{product.name}</b>
-                    </td>
-                    <td>{product.sku}</td>
-                    <td>{product.category}</td>
-                    <td>
-                      <Status>
-                        {product.stock === 0
-                          ? "Out of stock"
-                          : "Low stock"}
-                      </Status>
-                    </td>
-                  </tr>
-                ))}
+                {low
+                  .slice(0, 7)
+                  .map((product) => (
+                    <tr key={product.id}>
+                      <td>
+                        <b>
+                          {product.name}
+                        </b>
+                      </td>
+
+                      <td>
+                        {product.sku}
+                      </td>
+
+                      <td>
+                        {product.category ||
+                          "—"}
+                      </td>
+
+                      <td>
+                        {product.stock}
+                      </td>
+
+                      <td>
+                        <Status
+                          value={
+                            product.stock <=
+                            0
+                              ? "Out of stock"
+                              : "Low stock"
+                          }
+                        />
+                      </td>
+                    </tr>
+                  ))}
               </tbody>
             </table>
           </div>
+        ) : (
+          <Empty
+            title="Inventory looks good"
+            text="No low-stock products right now."
+          />
         )}
       </section>
     </div>
@@ -883,209 +1107,364 @@ function Dashboard({ data, setTab }) {
 ============================================================ */
 
 function Orders({ data, update }) {
-  const [query, setQuery] = useState("");
-  const [filter, setFilter] = useState("All");
-  const [selected, setSelected] = useState(null);
+  const [search, setSearch] =
+    useState("");
 
-  const orders = data.orders.filter((order) => {
-    const matchFilter =
-      filter === "All" || order.status === filter;
+  const [filter, setFilter] =
+    useState("All");
 
-    const text = `${order.id} ${order.name} ${
-      order.phone || ""
-    }`.toLowerCase();
+  const [selected, setSelected] =
+    useState(null);
 
-    return (
-      matchFilter &&
-      text.includes(query.trim().toLowerCase())
+  const orders = useMemo(() => {
+    return data.orders.filter(
+      (order) => {
+        const matchStatus =
+          filter === "All" ||
+          order.status === filter;
+
+        const text = `${order.id} ${
+          order.name || ""
+        } ${order.phone || ""} ${
+          order.email || ""
+        }`.toLowerCase();
+
+        return (
+          matchStatus &&
+          text.includes(
+            search
+              .trim()
+              .toLowerCase()
+          )
+        );
+      }
     );
-  });
+  }, [
+    data.orders,
+    search,
+    filter,
+  ]);
 
-  const changeStatus = (order, status) => {
+  const setStatus = (
+    order,
+    status
+  ) => {
     update(
       (state) => ({
-        orders: state.orders.map((x) =>
-          x.id === order.id ? { ...x, status } : x
+        orders: state.orders.map(
+          (x) =>
+            x.id === order.id
+              ? { ...x, status }
+              : x
         ),
       }),
-      "Order status updated",
+      "Order updated",
       `${order.id}: ${order.status} → ${status}`
     );
 
     setSelected((current) =>
       current?.id === order.id
-        ? { ...current, status }
+        ? {
+            ...current,
+            status,
+          }
         : current
     );
   };
 
   return (
     <>
-      <div className="ea-toolbar">
-        <div className="ea-search">
+      <div className="ad-toolbar">
+        <div className="ad-search">
           <span>⌕</span>
           <input
             placeholder="Search order, customer or phone..."
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
+            value={search}
+            onChange={(e) =>
+              setSearch(e.target.value)
+            }
           />
         </div>
 
         <select
-          className="ea-select"
+          className="ad-select"
           value={filter}
-          onChange={(e) => setFilter(e.target.value)}
+          onChange={(e) =>
+            setFilter(e.target.value)
+          }
         >
-          {["All", ...ORDER_STATUSES].map((status) => (
-            <option key={status}>{status}</option>
+          <option>All</option>
+
+          {STATUSES.map((x) => (
+            <option key={x}>
+              {x}
+            </option>
           ))}
         </select>
       </div>
 
-      <div className="ea-card no-pad">
-        <div className="ea-table-wrap">
-          <table className="ea-table">
-            <thead>
-              <tr>
-                <th>Order</th>
-                <th>Customer</th>
-                <th>Date</th>
-                <th>Payment</th>
-                <th>Total</th>
-                <th>Status</th>
-                <th />
-              </tr>
-            </thead>
-
-            <tbody>
-              {orders.map((order) => (
-                <tr key={order.id}>
-                  <td>
-                    <b>{order.id}</b>
-                  </td>
-
-                  <td>
-                    <b>{order.name}</b>
-                    <small>{order.phone}</small>
-                  </td>
-
-                  <td>{formatDate(order.time || order.ts)}</td>
-
-                  <td>{order.payment || order.pay}</td>
-
-                  <td>
-                    <b>{money(order.total)}</b>
-                  </td>
-
-                  <td>
-                    <Status>{order.status}</Status>
-                  </td>
-
-                  <td className="right">
-                    <button
-                      className="ea-icon-btn"
-                      onClick={() => setSelected(order)}
-                    >
-                      →
-                    </button>
-                  </td>
+      <section className="ad-card ad-no-padding">
+        {orders.length ? (
+          <div className="ad-table-wrap">
+            <table className="ad-table">
+              <thead>
+                <tr>
+                  <th>Order ID</th>
+                  <th>Customer</th>
+                  <th>Date</th>
+                  <th>Payment</th>
+                  <th>Total</th>
+                  <th>Status</th>
+                  <th />
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+              </thead>
 
-        {!orders.length && (
+              <tbody>
+                {orders.map((order) => (
+                  <tr key={order.id}>
+                    <td>
+                      <b>{order.id}</b>
+                    </td>
+
+                    <td>
+                      <b>
+                        {order.name ||
+                          "Customer"}
+                      </b>
+                      <small>
+                        {order.phone ||
+                          order.email ||
+                          "—"}
+                      </small>
+                    </td>
+
+                    <td>
+                      {dateText(
+                        order.time ||
+                          order.ts
+                      )}
+                    </td>
+
+                    <td>
+                      {order.payment ||
+                        order.pay ||
+                        "—"}
+                    </td>
+
+                    <td>
+                      <b>
+                        {money(
+                          order.total
+                        )}
+                      </b>
+                    </td>
+
+                    <td>
+                      <Status
+                        value={
+                          order.status
+                        }
+                      />
+                    </td>
+
+                    <td>
+                      <button
+                        className="ad-round-btn"
+                        onClick={() =>
+                          setSelected(
+                            order
+                          )
+                        }
+                      >
+                        →
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ) : (
           <Empty
+            icon="▣"
             title="No orders found"
-            text="Try changing your search or filter."
+            text="Try another search or status filter."
           />
         )}
-      </div>
+      </section>
 
       {selected && (
         <Modal
-          title={`Order ${selected.id}`}
-          onClose={() => setSelected(null)}
           wide
+          title={`Order ${selected.id}`}
+          subtitle="Order details and fulfilment"
+          onClose={() =>
+            setSelected(null)
+          }
         >
-          <div className="ea-order-summary">
+          <div className="ad-summary-grid">
             <div>
               <span>Customer</span>
-              <b>{selected.name}</b>
+              <b>
+                {selected.name ||
+                  "Customer"}
+              </b>
             </div>
 
             <div>
               <span>Total</span>
-              <b>{money(selected.total)}</b>
+              <b>
+                {money(
+                  selected.total
+                )}
+              </b>
             </div>
 
             <div>
               <span>Payment</span>
-              <b>{selected.payment || selected.pay}</b>
+              <b>
+                {selected.payment ||
+                  selected.pay ||
+                  "—"}
+              </b>
             </div>
 
             <div>
               <span>Placed</span>
-              <b>{formatDate(selected.time || selected.ts)}</b>
+              <b>
+                {dateText(
+                  selected.time ||
+                    selected.ts
+                )}
+              </b>
             </div>
           </div>
 
-          <div className="ea-detail-grid">
-            <div className="ea-subcard">
+          <div className="ad-two-col">
+            <section className="ad-inner-card">
               <h3>Order items</h3>
 
-              {(selected.items || []).map((item, index) => (
-                <div className="ea-line" key={index}>
-                  <div>
-                    <b>{item.name}</b>
-                    <span>Qty: {item.qty}</span>
-                  </div>
+              {(selected.items || [])
+                .length ? (
+                selected.items.map(
+                  (item, index) => (
+                    <div
+                      className="ad-line"
+                      key={index}
+                    >
+                      <div>
+                        <b>
+                          {item.name}
+                        </b>
+                        <span>
+                          Qty:{" "}
+                          {item.qty ||
+                            1}
+                        </span>
+                      </div>
 
-                  <b>{money(item.qty * item.price)}</b>
-                </div>
-              ))}
+                      <b>
+                        {money(
+                          Number(
+                            item.price ||
+                              0
+                          ) *
+                            Number(
+                              item.qty ||
+                                1
+                            )
+                        )}
+                      </b>
+                    </div>
+                  )
+                )
+              ) : (
+                <p className="ad-muted">
+                  No item details
+                  available.
+                </p>
+              )}
 
               {selected.coupon && (
-                <div className="ea-line">
-                  <span>Coupon: {selected.coupon}</span>
-                  <b>−{money(selected.discount || 0)}</b>
+                <div className="ad-line">
+                  <div>
+                    <b>
+                      Coupon
+                    </b>
+                    <span>
+                      {
+                        selected.coupon
+                      }
+                    </span>
+                  </div>
+
+                  <b>
+                    −
+                    {money(
+                      selected.discount ||
+                        0
+                    )}
+                  </b>
                 </div>
               )}
-            </div>
+            </section>
 
-            <div className="ea-subcard">
-              <h3>Customer details</h3>
+            <section className="ad-inner-card">
+              <h3>
+                Customer details
+              </h3>
 
-              <div className="ea-info">
+              <div className="ad-info-row">
                 <span>Phone</span>
-                <b>{selected.phone || "—"}</b>
+                <b>
+                  {selected.phone ||
+                    "—"}
+                </b>
               </div>
 
-              <div className="ea-info">
+              <div className="ad-info-row">
                 <span>Email</span>
-                <b>{selected.email || "—"}</b>
+                <b>
+                  {selected.email ||
+                    "—"}
+                </b>
               </div>
 
-              <div className="ea-info">
-                <span>Address</span>
-                <b>{selected.address || "—"}</b>
+              <div className="ad-info-row">
+                <span>
+                  Address
+                </span>
+                <b>
+                  {selected.address ||
+                    "—"}
+                </b>
               </div>
 
               <Field label="Order status">
                 <select
-                  className="ea-input"
-                  value={selected.status}
+                  className="ad-input"
+                  value={
+                    selected.status
+                  }
                   onChange={(e) =>
-                    changeStatus(selected, e.target.value)
+                    setStatus(
+                      selected,
+                      e.target.value
+                    )
                   }
                 >
-                  {ORDER_STATUSES.map((status) => (
-                    <option key={status}>{status}</option>
-                  ))}
+                  {STATUSES.map(
+                    (x) => (
+                      <option
+                        key={x}
+                      >
+                        {x}
+                      </option>
+                    )
+                  )}
                 </select>
               </Field>
-            </div>
+            </section>
           </div>
         </Modal>
       )}
@@ -1094,70 +1473,113 @@ function Orders({ data, update }) {
 }
 
 /* ============================================================
-   PRODUCTS
+   PRODUCT EDITOR
 ============================================================ */
 
-const PRODUCT_TAGS = [
-  "",
-  "New",
-  "Sale",
-  "Best seller",
-  "Top rated",
-];
-
-function ProductForm({
+function ProductEditor({
+  product,
   categories,
-  initial,
   onSave,
   onClose,
 }) {
-  const [form, setForm] = useState(
-    initial || {
-      name: "",
-      sku: "",
-      price: "",
-      stock: "",
-      category: categories[0]?.name || "",
-      subcategory: "",
-      tag: "",
-      active: true,
-      images: [],
-    }
-  );
+  const [form, setForm] =
+    useState(
+      product
+        ? {
+            ...product,
+            images:
+              product.images || [],
+          }
+        : {
+            name: "",
+            sku: "",
+            category:
+              categories[0]?.name ||
+              "",
+            subcategory: "",
+            price: "",
+            stock: 10,
+            low: LOW,
+            tag: "",
+            active: true,
+            images: [],
+            img: "",
+          }
+    );
+
+  const [uploading, setUploading] =
+    useState(false);
 
   const subs =
-    categories.find((x) => x.name === form.category)?.subs ||
-    [];
+    categories.find(
+      (x) =>
+        x.name === form.category
+    )?.subs || [];
 
-  const addImages = async (files) => {
-    const urls = (
-      await Promise.all(
-        [...files]
-          .slice(0, 4 - (form.images?.length || 0))
-          .map((file) => compressImage(file))
-      )
-    ).filter(Boolean);
+  const uploadImages = async (
+    files
+  ) => {
+    if (!files?.length) return;
 
-    setForm((x) => ({
-      ...x,
-      images: [...(x.images || []), ...urls].slice(0, 4),
-    }));
+    setUploading(true);
+
+    try {
+      const remaining =
+        4 -
+        (form.images?.length ||
+          0);
+
+      const selected = [
+        ...files,
+      ].slice(0, remaining);
+
+      const urls =
+        await Promise.all(
+          selected.map((file) =>
+            imageToDataURL(
+              file,
+              1200,
+              0.78
+            )
+          )
+        );
+
+      setForm((old) => ({
+        ...old,
+        images: [
+          ...(old.images || []),
+          ...urls.filter(Boolean),
+        ].slice(0, 4),
+      }));
+    } finally {
+      setUploading(false);
+    }
   };
 
   const removeImage = (index) => {
-    setForm((x) => ({
-      ...x,
-      images: x.images.filter((_, i) => i !== index),
+    setForm((old) => ({
+      ...old,
+      images: old.images.filter(
+        (_, i) => i !== index
+      ),
     }));
   };
 
-  const makeMain = (index) => {
-    setForm((x) => {
-      const images = [...x.images];
-      const [image] = images.splice(index, 1);
+  const mainImage = (index) => {
+    setForm((old) => {
+      const images = [
+        ...old.images,
+      ];
+
+      const [image] =
+        images.splice(index, 1);
+
       images.unshift(image);
 
-      return { ...x, images };
+      return {
+        ...old,
+        images,
+      };
     });
   };
 
@@ -1165,181 +1587,353 @@ function ProductForm({
     e.preventDefault();
 
     if (!form.name.trim()) {
-      return window.alert("Enter a product name.");
+      alert(
+        "Please enter product name."
+      );
+      return;
     }
 
     onSave({
       ...form,
+
       name: form.name.trim(),
-      price: Number(form.price || 0),
-      stock: Number(form.stock || 0),
-      low: Number(form.low ?? LOW_STOCK),
+
       sku:
-        form.sku?.trim() ||
-        `ES-${Date.now().toString().slice(-6)}`,
+        form.sku.trim() ||
+        `ES-${Date.now()
+          .toString()
+          .slice(-6)}`,
+
+      price: Number(
+        form.price || 0
+      ),
+
+      stock: Number(
+        form.stock || 0
+      ),
+
+      low: Number(
+        form.low || LOW
+      ),
     });
   };
 
   return (
     <form onSubmit={submit}>
-      <div className="ea-product-editor">
-        <div>
-          <div className="ea-form-grid">
+      <div className="ad-product-editor">
+        <div className="ad-form-section">
+          <div className="ad-form-section-title">
+            <span>01</span>
+            <div>
+              <h3>
+                Product information
+              </h3>
+              <p>
+                Basic product details
+                and pricing.
+              </p>
+            </div>
+          </div>
+
+          <div className="ad-form-grid">
             <Field label="Product name">
               <input
-                className="ea-input"
+                className="ad-input"
+                placeholder="Product name"
                 value={form.name}
                 onChange={(e) =>
-                  setForm({ ...form, name: e.target.value })
+                  setForm({
+                    ...form,
+                    name:
+                      e.target
+                        .value,
+                  })
                 }
               />
             </Field>
 
             <Field label="SKU">
               <input
-                className="ea-input"
+                className="ad-input"
                 placeholder="Auto generated"
-                value={form.sku || ""}
+                value={
+                  form.sku || ""
+                }
                 onChange={(e) =>
-                  setForm({ ...form, sku: e.target.value })
+                  setForm({
+                    ...form,
+                    sku:
+                      e.target
+                        .value,
+                  })
                 }
               />
             </Field>
 
             <Field label="Price (৳)">
               <input
-                className="ea-input"
+                className="ad-input"
                 type="number"
                 min="0"
                 value={form.price}
                 onChange={(e) =>
-                  setForm({ ...form, price: e.target.value })
+                  setForm({
+                    ...form,
+                    price:
+                      e.target
+                        .value,
+                  })
                 }
               />
             </Field>
 
-            <Field label="Stock">
+            <Field label="Stock quantity">
               <input
-                className="ea-input"
+                className="ad-input"
                 type="number"
                 min="0"
                 value={form.stock}
                 onChange={(e) =>
-                  setForm({ ...form, stock: e.target.value })
+                  setForm({
+                    ...form,
+                    stock:
+                      e.target
+                        .value,
+                  })
                 }
               />
             </Field>
 
-            <Field label="Category">
-              <select
-                className="ea-input"
-                value={form.category}
+            <Field label="Low stock warning">
+              <input
+                className="ad-input"
+                type="number"
+                min="0"
+                value={form.low}
                 onChange={(e) =>
                   setForm({
                     ...form,
-                    category: e.target.value,
-                    subcategory: "",
+                    low:
+                      e.target
+                        .value,
                   })
                 }
-              >
-                <option value="">Select category</option>
-
-                {categories.map((cat) => (
-                  <option key={cat.id}>{cat.name}</option>
-                ))}
-              </select>
-            </Field>
-
-            <Field label="Sub-category">
-              <select
-                className="ea-input"
-                value={form.subcategory || ""}
-                onChange={(e) =>
-                  setForm({
-                    ...form,
-                    subcategory: e.target.value,
-                  })
-                }
-              >
-                <option value="">None</option>
-
-                {subs.map((sub) => (
-                  <option key={sub}>{sub}</option>
-                ))}
-              </select>
+              />
             </Field>
 
             <Field label="Product label">
               <select
-                className="ea-input"
-                value={form.tag || ""}
-                onChange={(e) =>
-                  setForm({ ...form, tag: e.target.value })
+                className="ad-input"
+                value={
+                  form.tag || ""
                 }
-              >
-                {PRODUCT_TAGS.map((tag) => (
-                  <option key={tag} value={tag}>
-                    {tag || "None"}
-                  </option>
-                ))}
-              </select>
-            </Field>
-
-            <Field label="Visibility">
-              <select
-                className="ea-input"
-                value={form.active === false ? "hidden" : "visible"}
                 onChange={(e) =>
                   setForm({
                     ...form,
-                    active: e.target.value === "visible",
+                    tag:
+                      e.target
+                        .value,
                   })
                 }
               >
-                <option value="visible">Visible</option>
-                <option value="hidden">Hidden</option>
+                <option value="">
+                  None
+                </option>
+                <option>
+                  New
+                </option>
+                <option>
+                  Sale
+                </option>
+                <option>
+                  Best seller
+                </option>
+                <option>
+                  Top rated
+                </option>
               </select>
             </Field>
           </div>
         </div>
 
-        <div className="ea-image-box">
-          <h3>Product images</h3>
-          <p>Upload up to 4 product images.</p>
+        <div className="ad-form-section">
+          <div className="ad-form-section-title">
+            <span>02</span>
 
-          <div className="ea-product-images">
-            {(form.images || []).map((image, index) => (
-              <div className="ea-product-image" key={index}>
-                <img src={image} alt="" />
+            <div>
+              <h3>
+                Category
+              </h3>
+              <p>
+                Organize this product
+                in your catalog.
+              </p>
+            </div>
+          </div>
 
-                {index === 0 && (
-                  <span className="ea-main-photo">Main</span>
+          <div className="ad-form-grid">
+            <Field label="Category">
+              <select
+                className="ad-input"
+                value={
+                  form.category
+                }
+                onChange={(e) =>
+                  setForm({
+                    ...form,
+                    category:
+                      e.target
+                        .value,
+                    subcategory:
+                      "",
+                  })
+                }
+              >
+                <option value="">
+                  Select category
+                </option>
+
+                {categories.map(
+                  (cat) => (
+                    <option
+                      key={cat.id}
+                    >
+                      {cat.name}
+                    </option>
+                  )
                 )}
+              </select>
+            </Field>
 
-                <button
-                  type="button"
-                  className="ea-photo-delete"
-                  onClick={() => removeImage(index)}
+            <Field label="Sub-category">
+              <select
+                className="ad-input"
+                value={
+                  form.subcategory ||
+                  ""
+                }
+                onChange={(e) =>
+                  setForm({
+                    ...form,
+                    subcategory:
+                      e.target
+                        .value,
+                  })
+                }
+              >
+                <option value="">
+                  None
+                </option>
+
+                {subs.map((x) => (
+                  <option key={x}>
+                    {x}
+                  </option>
+                ))}
+              </select>
+            </Field>
+          </div>
+
+          <div className="ad-visibility">
+            <div>
+              <b>
+                Product visibility
+              </b>
+              <span>
+                Show this product on
+                your storefront.
+              </span>
+            </div>
+
+            <Toggle
+              value={
+                form.active !== false
+              }
+              onChange={(active) =>
+                setForm({
+                  ...form,
+                  active,
+                })
+              }
+            />
+          </div>
+        </div>
+
+        <div className="ad-form-section">
+          <div className="ad-form-section-title">
+            <span>03</span>
+
+            <div>
+              <h3>
+                Product images
+              </h3>
+              <p>
+                Add up to 4 images.
+                First image is the main
+                product photo.
+              </p>
+            </div>
+          </div>
+
+          <div className="ad-image-grid">
+            {(form.images || []).map(
+              (image, index) => (
+                <div
+                  className="ad-product-image"
+                  key={index}
                 >
-                  ×
-                </button>
+                  <img
+                    src={image}
+                    alt=""
+                  />
 
-                {index !== 0 && (
+                  {index === 0 && (
+                    <span className="ad-main-image">
+                      Main
+                    </span>
+                  )}
+
                   <button
                     type="button"
-                    className="ea-photo-main"
-                    onClick={() => makeMain(index)}
+                    className="ad-remove-image"
+                    onClick={() =>
+                      removeImage(
+                        index
+                      )
+                    }
                   >
-                    ★
+                    ×
                   </button>
-                )}
-              </div>
-            ))}
 
-            {(form.images || []).length < 4 && (
-              <label className="ea-upload">
-                <b>＋</b>
-                <span>Add image</span>
+                  {index > 0 && (
+                    <button
+                      type="button"
+                      className="ad-make-main"
+                      onClick={() =>
+                        mainImage(
+                          index
+                        )
+                      }
+                    >
+                      ★
+                    </button>
+                  )}
+                </div>
+              )
+            )}
+
+            {(form.images || [])
+              .length < 4 && (
+              <label className="ad-image-upload">
+                <div>＋</div>
+                <b>
+                  {uploading
+                    ? "Processing..."
+                    : "Add image"}
+                </b>
+                <span>
+                  JPG, PNG or WEBP
+                </span>
 
                 <input
                   hidden
@@ -1347,8 +1941,11 @@ function ProductForm({
                   type="file"
                   accept="image/*"
                   onChange={(e) => {
-                    addImages(e.target.files);
-                    e.target.value = "";
+                    uploadImages(
+                      e.target.files
+                    );
+                    e.target.value =
+                      "";
                   }}
                 />
               </label>
@@ -1357,16 +1954,19 @@ function ProductForm({
         </div>
       </div>
 
-      <div className="ea-modal-actions">
+      <div className="ad-modal-actions">
         <button
           type="button"
-          className="ea-btn secondary"
+          className="ad-btn ad-btn-light"
           onClick={onClose}
         >
           Cancel
         </button>
 
-        <button className="ea-btn primary" type="submit">
+        <button
+          type="submit"
+          className="ad-btn ad-btn-primary"
+        >
           Save product
         </button>
       </div>
@@ -1374,49 +1974,83 @@ function ProductForm({
   );
 }
 
+/* ============================================================
+   PRODUCTS
+============================================================ */
+
 function Products({ data, update }) {
-  const [query, setQuery] = useState("");
-  const [category, setCategory] = useState("All");
-  const [editor, setEditor] = useState(null);
+  const [search, setSearch] =
+    useState("");
 
-  const products = data.products.filter((product) => {
-    const matchCategory =
-      category === "All" || product.category === category;
+  const [category, setCategory] =
+    useState("All");
 
-    const text = `${product.name} ${product.sku}`.toLowerCase();
+  const [editor, setEditor] =
+    useState(null);
 
-    return (
-      matchCategory &&
-      text.includes(query.trim().toLowerCase())
-    );
-  });
+  const products = useMemo(
+    () =>
+      data.products.filter(
+        (p) => {
+          const matchesCategory =
+            category === "All" ||
+            p.category === category;
+
+          const text = `${p.name} ${
+            p.sku || ""
+          }`.toLowerCase();
+
+          return (
+            matchesCategory &&
+            text.includes(
+              search
+                .trim()
+                .toLowerCase()
+            )
+          );
+        }
+      ),
+    [
+      data.products,
+      category,
+      search,
+    ]
+  );
 
   const save = (product) => {
-    if (editor?.mode === "edit") {
+    if (editor?.product) {
       update(
         (state) => ({
-          products: state.products.map((x) =>
-            x.id === editor.product.id
-              ? { ...x, ...product }
-              : x
-          ),
+          products:
+            state.products.map(
+              (x) =>
+                x.id ===
+                editor.product.id
+                  ? {
+                      ...x,
+                      ...product,
+                    }
+                  : x
+            ),
         }),
         "Product updated",
         product.name
       );
     } else {
-      const item = {
+      const newProduct = {
         ...product,
         id: uid("PRODUCT"),
-        low: LOW_STOCK,
       };
 
       update(
         (state) => ({
-          products: [item, ...state.products],
+          products: [
+            newProduct,
+            ...state.products,
+          ],
         }),
         "Product added",
-        item.name
+        newProduct.name
       );
     }
 
@@ -1424,146 +2058,266 @@ function Products({ data, update }) {
   };
 
   const remove = (product) => {
-    if (!window.confirm(`Delete "${product.name}"?`)) return;
+    if (
+      !confirm(
+        `Delete "${product.name}"?`
+      )
+    )
+      return;
 
     update(
       (state) => ({
-        products: state.products.filter(
-          (x) => x.id !== product.id
-        ),
+        products:
+          state.products.filter(
+            (x) =>
+              x.id !== product.id
+          ),
       }),
       "Product deleted",
       product.name
     );
   };
 
+  const toggle = (product) => {
+    update(
+      (state) => ({
+        products:
+          state.products.map(
+            (x) =>
+              x.id === product.id
+                ? {
+                    ...x,
+                    active:
+                      !x.active,
+                  }
+                : x
+          ),
+      }),
+      product.active
+        ? "Product hidden"
+        : "Product published",
+      product.name
+    );
+  };
+
   return (
     <>
-      <div className="ea-toolbar">
-        <div className="ea-search">
+      <div className="ad-toolbar">
+        <div className="ad-search">
           <span>⌕</span>
+
           <input
             placeholder="Search products or SKU..."
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
+            value={search}
+            onChange={(e) =>
+              setSearch(e.target.value)
+            }
           />
         </div>
 
         <select
-          className="ea-select"
+          className="ad-select"
           value={category}
-          onChange={(e) => setCategory(e.target.value)}
+          onChange={(e) =>
+            setCategory(e.target.value)
+          }
         >
           <option>All</option>
 
-          {data.categories.map((cat) => (
-            <option key={cat.id}>{cat.name}</option>
-          ))}
+          {data.categories.map(
+            (x) => (
+              <option key={x.id}>
+                {x.name}
+              </option>
+            )
+          )}
         </select>
 
         <button
-          className="ea-btn primary"
-          onClick={() => setEditor({ mode: "new" })}
+          className="ad-btn ad-btn-primary"
+          onClick={() =>
+            setEditor({
+              product: null,
+            })
+          }
         >
           ＋ Add product
         </button>
       </div>
 
-      <div className="ea-product-grid">
-        {products.map((product) => (
-          <article className="ea-product-card" key={product.id}>
-            <div className="ea-product-thumb">
-              {product.images?.[0] ? (
-                <img src={product.images[0]} alt={product.name} />
-              ) : (
-                <div className="ea-no-photo">◇</div>
-              )}
+      {products.length ? (
+        <div className="ad-product-grid">
+          {products.map((product) => (
+            <article
+              className="ad-product-card"
+              key={product.id}
+            >
+              <div className="ad-product-photo">
+                {product.images?.[0] ? (
+                  <img
+                    src={
+                      product
+                        .images[0]
+                    }
+                    alt={
+                      product.name
+                    }
+                  />
+                ) : (
+                  <div className="ad-photo-placeholder">
+                    ◇
+                  </div>
+                )}
 
-              <span
-                className={`ea-product-state ${
-                  product.active === false ? "hidden" : ""
-                }`}
-              >
-                {product.active === false ? "Hidden" : "Live"}
-              </span>
-            </div>
-
-            <div className="ea-product-body">
-              <div className="ea-product-title">
-                <div>
-                  <h3>{product.name}</h3>
-                  <span>{product.sku}</span>
-                </div>
+                <span
+                  className={`ad-live ${
+                    product.active
+                      ? ""
+                      : "hidden"
+                  }`}
+                >
+                  {product.active
+                    ? "Live"
+                    : "Hidden"}
+                </span>
 
                 {product.tag && (
-                  <span className="ea-tag">{product.tag}</span>
+                  <span className="ad-product-tag">
+                    {product.tag}
+                  </span>
                 )}
               </div>
 
-              <div className="ea-product-meta">
-                <div>
-                  <span>Price</span>
-                  <b>{money(product.price)}</b>
+              <div className="ad-product-info">
+                <span className="ad-product-category">
+                  {product.category ||
+                    "Uncategorized"}
+                </span>
+
+                <h3>
+                  {product.name}
+                </h3>
+
+                <p>
+                  {product.sku}
+                </p>
+
+                <div className="ad-product-data">
+                  <div>
+                    <span>
+                      Price
+                    </span>
+                    <b>
+                      {money(
+                        product.price
+                      )}
+                    </b>
+                  </div>
+
+                  <div>
+                    <span>
+                      Stock
+                    </span>
+                    <b>
+                      {
+                        product.stock
+                      }
+                    </b>
+                  </div>
+
+                  <div>
+                    <span>
+                      Status
+                    </span>
+                    <Status
+                      value={
+                        product.stock <=
+                        0
+                          ? "Out of stock"
+                          : product.stock <=
+                            (product.low ||
+                              LOW)
+                          ? "Low stock"
+                          : "In stock"
+                      }
+                    />
+                  </div>
                 </div>
 
-                <div>
-                  <span>Stock</span>
-                  <b>{product.stock}</b>
-                </div>
+                <div className="ad-product-buttons">
+                  <button
+                    className="ad-btn ad-btn-light"
+                    onClick={() =>
+                      setEditor({
+                        product,
+                      })
+                    }
+                  >
+                    Edit
+                  </button>
 
-                <div>
-                  <span>Category</span>
-                  <b>{product.category || "—"}</b>
+                  <button
+                    className="ad-icon-action"
+                    title={
+                      product.active
+                        ? "Hide"
+                        : "Publish"
+                    }
+                    onClick={() =>
+                      toggle(product)
+                    }
+                  >
+                    {product.active
+                      ? "◉"
+                      : "○"}
+                  </button>
+
+                  <button
+                    className="ad-icon-action danger"
+                    onClick={() =>
+                      remove(product)
+                    }
+                  >
+                    ×
+                  </button>
                 </div>
               </div>
-
-              <div className="ea-product-actions">
-                <button
-                  className="ea-btn secondary"
-                  onClick={() =>
-                    setEditor({
-                      mode: "edit",
-                      product,
-                    })
-                  }
-                >
-                  Edit
-                </button>
-
-                <button
-                  className="ea-btn danger"
-                  onClick={() => remove(product)}
-                >
-                  Delete
-                </button>
-              </div>
-            </div>
-          </article>
-        ))}
-      </div>
-
-      {!products.length && (
-        <Empty
-          title="No products found"
-          text="Add a product or change your search."
-        />
+            </article>
+          ))}
+        </div>
+      ) : (
+        <section className="ad-card">
+          <Empty
+            title="No products found"
+            text="Create a new product or change your filters."
+          />
+        </section>
       )}
 
       {editor && (
         <Modal
           wide
           title={
-            editor.mode === "edit"
+            editor.product
               ? "Edit product"
               : "Add new product"
           }
-          onClose={() => setEditor(null)}
+          subtitle="Manage product information, images and inventory."
+          onClose={() =>
+            setEditor(null)
+          }
         >
-          <ProductForm
-            categories={data.categories}
-            initial={editor.product}
+          <ProductEditor
+            product={
+              editor.product
+            }
+            categories={
+              data.categories
+            }
             onSave={save}
-            onClose={() => setEditor(null)}
+            onClose={() =>
+              setEditor(null)
+            }
           />
         </Modal>
       )}
@@ -1575,215 +2329,351 @@ function Products({ data, update }) {
    INVENTORY
 ============================================================ */
 
-function Inventory({ data, update }) {
-  const [query, setQuery] = useState("");
-  const [filter, setFilter] = useState("All");
+function Inventory({
+  data,
+  update,
+}) {
+  const [search, setSearch] =
+    useState("");
 
-  const products = data.products.filter((product) => {
-    const text = `${product.name} ${product.sku}`.toLowerCase();
+  const [filter, setFilter] =
+    useState("All");
 
-    const searchMatch = text.includes(
-      query.trim().toLowerCase()
+  const products = useMemo(
+    () =>
+      data.products.filter(
+        (p) => {
+          const text = `${p.name} ${
+            p.sku || ""
+          }`.toLowerCase();
+
+          if (
+            !text.includes(
+              search
+                .trim()
+                .toLowerCase()
+            )
+          )
+            return false;
+
+          if (
+            filter === "Low stock"
+          ) {
+            return (
+              p.stock > 0 &&
+              p.stock <=
+                (p.low || LOW)
+            );
+          }
+
+          if (
+            filter ===
+            "Out of stock"
+          ) {
+            return p.stock <= 0;
+          }
+
+          return true;
+        }
+      ),
+    [
+      data.products,
+      search,
+      filter,
+    ]
+  );
+
+  const changeStock = (
+    product,
+    value
+  ) => {
+    const stock = Math.max(
+      0,
+      Number(value || 0)
     );
 
-    let filterMatch = true;
-
-    if (filter === "Low stock") {
-      filterMatch =
-        product.stock > 0 &&
-        product.stock <= (product.low ?? LOW_STOCK);
-    }
-
-    if (filter === "Out of stock") {
-      filterMatch = product.stock === 0;
-    }
-
-    return searchMatch && filterMatch;
-  });
-
-  const setStock = (product, stock) => {
-    stock = Math.max(0, Number(stock || 0));
+    if (stock === product.stock)
+      return;
 
     update(
       (state) => ({
-        products: state.products.map((x) =>
-          x.id === product.id ? { ...x, stock } : x
-        ),
+        products:
+          state.products.map(
+            (x) =>
+              x.id === product.id
+                ? {
+                    ...x,
+                    stock,
+                  }
+                : x
+          ),
       }),
-      "Inventory adjusted",
+      "Inventory updated",
       `${product.name}: ${product.stock} → ${stock}`
     );
   };
 
-  const setLow = (product, low) => {
-    low = Math.max(0, Number(low || 0));
+  const changeLow = (
+    product,
+    value
+  ) => {
+    const low = Math.max(
+      0,
+      Number(value || 0)
+    );
 
     update(
       (state) => ({
-        products: state.products.map((x) =>
-          x.id === product.id ? { ...x, low } : x
-        ),
+        products:
+          state.products.map(
+            (x) =>
+              x.id === product.id
+                ? {
+                    ...x,
+                    low,
+                  }
+                : x
+          ),
       }),
-      "Low stock level updated",
+      "Low-stock alert updated",
       `${product.name}: ${low}`
     );
   };
 
-  const totalUnits = data.products.reduce(
-    (sum, x) => sum + Number(x.stock || 0),
-    0
-  );
+  const units =
+    data.products.reduce(
+      (sum, x) =>
+        sum +
+        Number(x.stock || 0),
+      0
+    );
+
+  const lowCount =
+    data.products.filter(
+      (x) =>
+        x.stock <=
+        (x.low || LOW)
+    ).length;
 
   return (
     <>
-      <div className="ea-mini-stats">
+      <section className="ad-mini-stats">
         <div>
-          <span>Total products</span>
-          <b>{data.products.length}</b>
-        </div>
-
-        <div>
-          <span>Units in stock</span>
-          <b>{totalUnits}</b>
-        </div>
-
-        <div>
-          <span>Low stock</span>
+          <span>
+            Total products
+          </span>
           <b>
-            {
-              data.products.filter(
-                (x) =>
-                  x.stock <= (x.low ?? LOW_STOCK)
-              ).length
-            }
+            {data.products.length}
           </b>
         </div>
-      </div>
 
-      <div className="ea-toolbar">
-        <div className="ea-search">
+        <div>
+          <span>
+            Units in stock
+          </span>
+          <b>{units}</b>
+        </div>
+
+        <div>
+          <span>
+            Low / out of stock
+          </span>
+          <b>{lowCount}</b>
+        </div>
+      </section>
+
+      <div className="ad-toolbar">
+        <div className="ad-search">
           <span>⌕</span>
+
           <input
             placeholder="Search inventory..."
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
+            value={search}
+            onChange={(e) =>
+              setSearch(e.target.value)
+            }
           />
         </div>
 
         <select
-          className="ea-select"
+          className="ad-select"
           value={filter}
-          onChange={(e) => setFilter(e.target.value)}
+          onChange={(e) =>
+            setFilter(e.target.value)
+          }
         >
           <option>All</option>
-          <option>Low stock</option>
-          <option>Out of stock</option>
+          <option>
+            Low stock
+          </option>
+          <option>
+            Out of stock
+          </option>
         </select>
       </div>
 
-      <div className="ea-card no-pad">
-        <div className="ea-table-wrap">
-          <table className="ea-table inventory-table">
-            <thead>
-              <tr>
-                <th>Product</th>
-                <th>SKU</th>
-                <th>Status</th>
-                <th>Quick adjust</th>
-                <th>Exact stock</th>
-                <th>Low alert</th>
-              </tr>
-            </thead>
+      <section className="ad-card ad-no-padding">
+        {products.length ? (
+          <div className="ad-table-wrap">
+            <table className="ad-table">
+              <thead>
+                <tr>
+                  <th>Product</th>
+                  <th>SKU</th>
+                  <th>Status</th>
+                  <th>Quick stock</th>
+                  <th>Exact stock</th>
+                  <th>Low alert</th>
+                </tr>
+              </thead>
 
-            <tbody>
-              {products.map((product) => {
-                const low =
-                  product.stock <=
-                  (product.low ?? LOW_STOCK);
+              <tbody>
+                {products.map(
+                  (product) => (
+                    <tr
+                      key={
+                        product.id
+                      }
+                    >
+                      <td>
+                        <div className="ad-table-product">
+                          {product
+                            .images?.[0] ? (
+                            <img
+                              src={
+                                product
+                                  .images[0]
+                              }
+                              alt=""
+                            />
+                          ) : (
+                            <span>
+                              ◇
+                            </span>
+                          )}
 
-                return (
-                  <tr key={product.id}>
-                    <td>
-                      <b>{product.name}</b>
-                      <small>{product.category}</small>
-                    </td>
+                          <div>
+                            <b>
+                              {
+                                product.name
+                              }
+                            </b>
+                            <small>
+                              {product.category ||
+                                "—"}
+                            </small>
+                          </div>
+                        </div>
+                      </td>
 
-                    <td>{product.sku}</td>
+                      <td>
+                        {product.sku}
+                      </td>
 
-                    <td>
-                      {low ? (
-                        <Status>
-                          {product.stock === 0
-                            ? "Out of stock"
-                            : "Low stock"}
-                        </Status>
-                      ) : (
-                        <Status>In stock</Status>
-                      )}
-                    </td>
+                      <td>
+                        <Status
+                          value={
+                            product.stock <=
+                            0
+                              ? "Out of stock"
+                              : product.stock <=
+                                (product.low ||
+                                  LOW)
+                              ? "Low stock"
+                              : "In stock"
+                          }
+                        />
+                      </td>
 
-                    <td>
-                      <div className="ea-stepper">
-                        <button
-                          onClick={() =>
-                            setStock(
+                      <td>
+                        <div className="ad-stepper">
+                          <button
+                            onClick={() =>
+                              changeStock(
+                                product,
+                                product.stock -
+                                  1
+                              )
+                            }
+                          >
+                            −
+                          </button>
+
+                          <b>
+                            {
+                              product.stock
+                            }
+                          </b>
+
+                          <button
+                            onClick={() =>
+                              changeStock(
+                                product,
+                                product.stock +
+                                  1
+                              )
+                            }
+                          >
+                            +
+                          </button>
+                        </div>
+                      </td>
+
+                      <td>
+                        <input
+                          key={`stock-${product.id}-${product.stock}`}
+                          className="ad-number"
+                          type="number"
+                          min="0"
+                          defaultValue={
+                            product.stock
+                          }
+                          onBlur={(
+                            e
+                          ) =>
+                            changeStock(
                               product,
-                              product.stock - 1
+                              e.target
+                                .value
                             )
                           }
-                        >
-                          −
-                        </button>
+                        />
+                      </td>
 
-                        <b>{product.stock}</b>
-
-                        <button
-                          onClick={() =>
-                            setStock(
+                      <td>
+                        <input
+                          key={`low-${product.id}-${product.low}`}
+                          className="ad-number"
+                          type="number"
+                          min="0"
+                          defaultValue={
+                            product.low ||
+                            LOW
+                          }
+                          onBlur={(
+                            e
+                          ) =>
+                            changeLow(
                               product,
-                              product.stock + 1
+                              e.target
+                                .value
                             )
                           }
-                        >
-                          +
-                        </button>
-                      </div>
-                    </td>
-
-                    <td>
-                      <input
-                        key={`${product.id}-${product.stock}`}
-                        className="ea-small-input"
-                        type="number"
-                        min="0"
-                        defaultValue={product.stock}
-                        onBlur={(e) =>
-                          setStock(product, e.target.value)
-                        }
-                      />
-                    </td>
-
-                    <td>
-                      <input
-                        key={`${product.id}-${product.low}`}
-                        className="ea-small-input"
-                        type="number"
-                        min="0"
-                        defaultValue={
-                          product.low ?? LOW_STOCK
-                        }
-                        onBlur={(e) =>
-                          setLow(product, e.target.value)
-                        }
-                      />
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
-      </div>
+                        />
+                      </td>
+                    </tr>
+                  )
+                )}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <Empty
+            title="No inventory found"
+            text="Try another filter."
+          />
+        )}
+      </section>
     </>
   );
 }
@@ -1792,9 +2682,15 @@ function Inventory({ data, update }) {
    CATEGORIES
 ============================================================ */
 
-function Categories({ data, update }) {
-  const [name, setName] = useState("");
-  const [subs, setSubs] = useState({});
+function Categories({
+  data,
+  update,
+}) {
+  const [name, setName] =
+    useState("");
+
+  const [subInputs, setSubInputs] =
+    useState({});
 
   const addCategory = (e) => {
     e.preventDefault();
@@ -1806,10 +2702,14 @@ function Categories({ data, update }) {
     if (
       data.categories.some(
         (x) =>
-          x.name.toLowerCase() === value.toLowerCase()
+          x.name.toLowerCase() ===
+          value.toLowerCase()
       )
     ) {
-      return window.alert("Category already exists.");
+      alert(
+        "Category already exists."
+      );
+      return;
     }
 
     update(
@@ -1830,179 +2730,305 @@ function Categories({ data, update }) {
     setName("");
   };
 
-  const removeCategory = (category) => {
-    if (
-      data.products.some(
-        (x) => x.category === category.name
-      )
-    ) {
-      return window.alert(
-        "Move or delete products from this category first."
-      );
-    }
-
-    if (!window.confirm(`Delete "${category.name}"?`))
-      return;
-
-    update(
-      (state) => ({
-        categories: state.categories.filter(
-          (x) => x.id !== category.id
-        ),
-      }),
-      "Category deleted",
-      category.name
-    );
-  };
-
   const addSub = (category) => {
-    const value = (subs[category.id] || "").trim();
+    const value = String(
+      subInputs[category.id] || ""
+    ).trim();
 
     if (!value) return;
 
+    if (
+      category.subs?.some(
+        (x) =>
+          x.toLowerCase() ===
+          value.toLowerCase()
+      )
+    ) {
+      alert(
+        "Sub-category already exists."
+      );
+      return;
+    }
+
     update(
       (state) => ({
-        categories: state.categories.map((x) =>
-          x.id === category.id
-            ? {
-                ...x,
-                subs: [...(x.subs || []), value],
-              }
-            : x
-        ),
+        categories:
+          state.categories.map(
+            (x) =>
+              x.id === category.id
+                ? {
+                    ...x,
+                    subs: [
+                      ...(x.subs ||
+                        []),
+                      value,
+                    ],
+                  }
+                : x
+          ),
       }),
       "Sub-category added",
       `${category.name} → ${value}`
     );
 
-    setSubs({
-      ...subs,
+    setSubInputs((old) => ({
+      ...old,
       [category.id]: "",
-    });
+    }));
   };
 
-  const removeSub = (category, sub) => {
+  const removeSub = (
+    category,
+    sub
+  ) => {
     update(
       (state) => ({
-        categories: state.categories.map((x) =>
-          x.id === category.id
-            ? {
-                ...x,
-                subs: x.subs.filter((s) => s !== sub),
-              }
-            : x
-        ),
+        categories:
+          state.categories.map(
+            (x) =>
+              x.id === category.id
+                ? {
+                    ...x,
+                    subs: (
+                      x.subs || []
+                    ).filter(
+                      (s) =>
+                        s !== sub
+                    ),
+                  }
+                : x
+          ),
 
-        products: state.products.map((product) =>
-          product.category === category.name &&
-          product.subcategory === sub
-            ? { ...product, subcategory: "" }
-            : product
-        ),
+        products:
+          state.products.map(
+            (p) =>
+              p.category ===
+                category.name &&
+              p.subcategory === sub
+                ? {
+                    ...p,
+                    subcategory:
+                      "",
+                  }
+                : p
+          ),
       }),
       "Sub-category deleted",
       `${category.name} → ${sub}`
     );
   };
 
+  const removeCategory = (
+    category
+  ) => {
+    const used =
+      data.products.some(
+        (x) =>
+          x.category ===
+          category.name
+      );
+
+    if (used) {
+      alert(
+        "This category has products. Move or delete those products first."
+      );
+      return;
+    }
+
+    if (
+      !confirm(
+        `Delete category "${category.name}"?`
+      )
+    )
+      return;
+
+    update(
+      (state) => ({
+        categories:
+          state.categories.filter(
+            (x) =>
+              x.id !== category.id
+          ),
+      }),
+      "Category deleted",
+      category.name
+    );
+  };
+
   return (
     <>
-      <form className="ea-create-bar" onSubmit={addCategory}>
+      <form
+        className="ad-create-category"
+        onSubmit={addCategory}
+      >
         <div>
-          <span className="ea-eyebrow">Catalog</span>
-          <h3>Create category</h3>
+          <span className="ad-kicker">
+            CATALOG
+          </span>
+          <h2>
+            Create a category
+          </h2>
+          <p>
+            Add a new product
+            category to your store.
+          </p>
         </div>
 
         <input
-          className="ea-input"
+          className="ad-input"
           placeholder="e.g. Fashion"
           value={name}
-          onChange={(e) => setName(e.target.value)}
+          onChange={(e) =>
+            setName(e.target.value)
+          }
         />
 
-        <button className="ea-btn primary">
+        <button className="ad-btn ad-btn-primary">
           ＋ Add category
         </button>
       </form>
 
-      <div className="ea-category-grid">
-        {data.categories.map((category) => (
-          <div className="ea-card" key={category.id}>
-            <div className="ea-card-head">
-              <div>
-                <h2>{category.name}</h2>
-                <p>
-                  {
-                    data.products.filter(
-                      (x) =>
-                        x.category === category.name
-                    ).length
-                  }{" "}
-                  products
-                </p>
-              </div>
+      {data.categories.length ? (
+        <div className="ad-category-grid">
+          {data.categories.map(
+            (category) => {
+              const count =
+                data.products.filter(
+                  (x) =>
+                    x.category ===
+                    category.name
+                ).length;
 
-              <button
-                className="ea-icon-btn danger"
-                onClick={() =>
-                  removeCategory(category)
-                }
-              >
-                ×
-              </button>
-            </div>
-
-            <div className="ea-chips">
-              {(category.subs || []).map((sub) => (
-                <span className="ea-chip" key={sub}>
-                  {sub}
-
-                  <button
-                    onClick={() =>
-                      removeSub(category, sub)
-                    }
-                  >
-                    ×
-                  </button>
-                </span>
-              ))}
-
-              {!category.subs?.length && (
-                <span className="ea-muted">
-                  No sub-categories
-                </span>
-              )}
-            </div>
-
-            <div className="ea-inline-add">
-              <input
-                className="ea-input"
-                placeholder="New sub-category"
-                value={subs[category.id] || ""}
-                onChange={(e) =>
-                  setSubs({
-                    ...subs,
-                    [category.id]: e.target.value,
-                  })
-                }
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") {
-                    e.preventDefault();
-                    addSub(category);
+              return (
+                <article
+                  className="ad-card"
+                  key={
+                    category.id
                   }
-                }}
-              />
+                >
+                  <div className="ad-card-head">
+                    <div>
+                      <span className="ad-kicker">
+                        CATEGORY
+                      </span>
+                      <h2>
+                        {
+                          category.name
+                        }
+                      </h2>
+                      <p>
+                        {count}{" "}
+                        product
+                        {count === 1
+                          ? ""
+                          : "s"}
+                      </p>
+                    </div>
 
-              <button
-                className="ea-btn secondary"
-                onClick={() => addSub(category)}
-              >
-                Add
-              </button>
-            </div>
-          </div>
-        ))}
-      </div>
+                    <button
+                      className="ad-round-btn danger"
+                      onClick={() =>
+                        removeCategory(
+                          category
+                        )
+                      }
+                    >
+                      ×
+                    </button>
+                  </div>
+
+                  <div className="ad-subcategories">
+                    {(category.subs ||
+                      []).map(
+                      (sub) => (
+                        <span
+                          key={sub}
+                        >
+                          {sub}
+
+                          <button
+                            onClick={() =>
+                              removeSub(
+                                category,
+                                sub
+                              )
+                            }
+                          >
+                            ×
+                          </button>
+                        </span>
+                      )
+                    )}
+
+                    {!category.subs
+                      ?.length && (
+                      <p className="ad-muted">
+                        No
+                        sub-categories
+                        yet.
+                      </p>
+                    )}
+                  </div>
+
+                  <div className="ad-inline-form">
+                    <input
+                      className="ad-input"
+                      placeholder="Add sub-category"
+                      value={
+                        subInputs[
+                          category.id
+                        ] || ""
+                      }
+                      onChange={(e) =>
+                        setSubInputs(
+                          (old) => ({
+                            ...old,
+                            [category.id]:
+                              e
+                                .target
+                                .value,
+                          })
+                        )
+                      }
+                      onKeyDown={(
+                        e
+                      ) => {
+                        if (
+                          e.key ===
+                          "Enter"
+                        ) {
+                          e.preventDefault();
+                          addSub(
+                            category
+                          );
+                        }
+                      }}
+                    />
+
+                    <button
+                      className="ad-btn ad-btn-light"
+                      onClick={() =>
+                        addSub(
+                          category
+                        )
+                      }
+                    >
+                      Add
+                    </button>
+                  </div>
+                </article>
+              );
+            }
+          )}
+        </div>
+      ) : (
+        <section className="ad-card">
+          <Empty
+            title="No categories"
+            text="Create your first category."
+          />
+        </section>
+      )}
     </>
   );
 }
@@ -2012,121 +3038,215 @@ function Categories({ data, update }) {
 ============================================================ */
 
 function Customers({ data }) {
-  const [query, setQuery] = useState("");
-  const [selected, setSelected] = useState(null);
+  const [search, setSearch] =
+    useState("");
 
-  const customers = getCustomers(data).filter((customer) =>
-    `${customer.name} ${customer.phone || ""} ${
-      customer.email || ""
-    }`
-      .toLowerCase()
-      .includes(query.trim().toLowerCase())
+  const [selected, setSelected] =
+    useState(null);
+
+  const customers = useMemo(
+    () =>
+      buildCustomers(
+        data.orders
+      ).filter((c) =>
+        `${c.name} ${c.phone} ${c.email}`
+          .toLowerCase()
+          .includes(
+            search
+              .trim()
+              .toLowerCase()
+          )
+      ),
+    [data.orders, search]
   );
 
   return (
     <>
-      <div className="ea-toolbar">
-        <div className="ea-search">
+      <div className="ad-toolbar">
+        <div className="ad-search">
           <span>⌕</span>
 
           <input
             placeholder="Search customers..."
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
+            value={search}
+            onChange={(e) =>
+              setSearch(e.target.value)
+            }
           />
         </div>
       </div>
 
-      <div className="ea-customer-grid">
-        {customers.map((customer) => (
-          <button
-            className="ea-customer-card"
-            key={customer.key}
-            onClick={() => setSelected(customer)}
-          >
-            <div className="ea-customer-avatar">
-              {customer.name?.[0]?.toUpperCase()}
-            </div>
+      {customers.length ? (
+        <div className="ad-customer-grid">
+          {customers.map(
+            (customer) => (
+              <button
+                className="ad-customer"
+                key={customer.id}
+                onClick={() =>
+                  setSelected(
+                    customer
+                  )
+                }
+              >
+                <div className="ad-customer-avatar">
+                  {customer.name
+                    ?.charAt(0)
+                    .toUpperCase() ||
+                    "C"}
+                </div>
 
-            <div className="ea-customer-name">
-              <h3>{customer.name}</h3>
-              <span>{customer.phone || customer.email}</span>
-            </div>
+                <div className="ad-customer-main">
+                  <h3>
+                    {customer.name}
+                  </h3>
 
-            <div className="ea-customer-numbers">
-              <div>
-                <b>{customer.orders.length}</b>
-                <span>Orders</span>
-              </div>
+                  <span>
+                    {customer.phone ||
+                      customer.email ||
+                      "No contact"}
+                  </span>
+                </div>
 
-              <div>
-                <b>{money(customer.spent)}</b>
-                <span>Spent</span>
-              </div>
-            </div>
-          </button>
-        ))}
-      </div>
+                <div className="ad-customer-stats">
+                  <div>
+                    <b>
+                      {
+                        customer
+                          .orders
+                          .length
+                      }
+                    </b>
+                    <span>
+                      Orders
+                    </span>
+                  </div>
 
-      {!customers.length && (
-        <Empty
-          title="No customers found"
-          text="Customers appear after they place orders."
-        />
+                  <div>
+                    <b>
+                      {money(
+                        customer.spent
+                      )}
+                    </b>
+                    <span>
+                      Spent
+                    </span>
+                  </div>
+                </div>
+
+                <span className="ad-customer-arrow">
+                  →
+                </span>
+              </button>
+            )
+          )}
+        </div>
+      ) : (
+        <section className="ad-card">
+          <Empty
+            icon="◎"
+            title="No customers found"
+            text="Customers are created automatically from orders."
+          />
+        </section>
       )}
 
       {selected && (
         <Modal
-          title={selected.name}
           wide
-          onClose={() => setSelected(null)}
+          title={selected.name}
+          subtitle="Customer profile and order history"
+          onClose={() =>
+            setSelected(null)
+          }
         >
-          <div className="ea-order-summary">
+          <div className="ad-summary-grid">
             <div>
               <span>Phone</span>
-              <b>{selected.phone || "—"}</b>
+              <b>
+                {selected.phone ||
+                  "—"}
+              </b>
             </div>
 
             <div>
               <span>Email</span>
-              <b>{selected.email || "—"}</b>
+              <b>
+                {selected.email ||
+                  "—"}
+              </b>
             </div>
 
             <div>
               <span>Orders</span>
-              <b>{selected.orders.length}</b>
+              <b>
+                {
+                  selected.orders
+                    .length
+                }
+              </b>
             </div>
 
             <div>
               <span>Total spent</span>
-              <b>{money(selected.spent)}</b>
+              <b>
+                {money(
+                  selected.spent
+                )}
+              </b>
             </div>
           </div>
 
-          <div className="ea-subcard">
-            <h3>Address</h3>
-            <p>{selected.address || "No address"}</p>
-          </div>
+          <section className="ad-inner-card">
+            <h3>
+              Shipping address
+            </h3>
 
-          <div className="ea-subcard">
+            <p className="ad-muted">
+              {selected.address ||
+                "No address available."}
+            </p>
+          </section>
+
+          <section className="ad-inner-card">
             <h3>Order history</h3>
 
-            {selected.orders.map((order) => (
-              <div className="ea-line" key={order.id}>
-                <div>
-                  <b>{order.id}</b>
-                  <span>
-                    {formatDate(order.time || order.ts)}
-                  </span>
-                </div>
+            {selected.orders.map(
+              (order) => (
+                <div
+                  className="ad-line"
+                  key={order.id}
+                >
+                  <div>
+                    <b>
+                      {order.id}
+                    </b>
 
-                <div className="right">
-                  <b>{money(order.total)}</b>
-                  <Status>{order.status}</Status>
+                    <span>
+                      {dateText(
+                        order.time ||
+                          order.ts
+                      )}
+                    </span>
+                  </div>
+
+                  <div className="ad-line-right">
+                    <b>
+                      {money(
+                        order.total
+                      )}
+                    </b>
+
+                    <Status
+                      value={
+                        order.status
+                      }
+                    />
+                  </div>
                 </div>
-              </div>
-            ))}
-          </div>
+              )
+            )}
+          </section>
         </Modal>
       )}
     </>
@@ -2138,33 +3258,53 @@ function Customers({ data }) {
 ============================================================ */
 
 function Reviews({ data, update }) {
-  const [filter, setFilter] = useState("All");
+  const [filter, setFilter] =
+    useState("All");
 
-  const reviews = data.reviews.filter(
-    (review) =>
-      filter === "All" || review.status === filter
-  );
+  const reviews =
+    data.reviews.filter(
+      (x) =>
+        filter === "All" ||
+        x.status === filter
+    );
 
-  const change = (review, status) => {
+  const setStatus = (
+    review,
+    status
+  ) => {
     update(
       (state) => ({
-        reviews: state.reviews.map((x) =>
-          x.id === review.id ? { ...x, status } : x
-        ),
+        reviews:
+          state.reviews.map(
+            (x) =>
+              x.id === review.id
+                ? {
+                    ...x,
+                    status,
+                  }
+                : x
+          ),
       }),
       `Review ${status.toLowerCase()}`,
-      `${review.author} · ${review.product}`
+      `${review.author || "Customer"} · ${review.product}`
     );
   };
 
   const remove = (review) => {
-    if (!window.confirm("Delete this review?")) return;
+    if (
+      !confirm(
+        "Delete this review?"
+      )
+    )
+      return;
 
     update(
       (state) => ({
-        reviews: state.reviews.filter(
-          (x) => x.id !== review.id
-        ),
+        reviews:
+          state.reviews.filter(
+            (x) =>
+              x.id !== review.id
+          ),
       }),
       "Review deleted",
       review.product
@@ -2173,104 +3313,166 @@ function Reviews({ data, update }) {
 
   return (
     <>
-      <div className="ea-filter-tabs">
-        {["All", "Pending", "Approved", "Rejected"].map(
-          (item) => (
-            <button
-              className={filter === item ? "active" : ""}
-              key={item}
-              onClick={() => setFilter(item)}
-            >
-              {item}
-            </button>
-          )
-        )}
-      </div>
-
-      <div className="ea-review-grid">
-        {reviews.map((review) => (
-          <article className="ea-review" key={review.id}>
-            <div className="ea-review-top">
-              <div className="ea-avatar">
-                {review.author?.[0]?.toUpperCase()}
-              </div>
-
-              <div>
-                <h3>{review.author}</h3>
-                <span>
-                  {formatDate(review.time || review.ts)}
-                </span>
-              </div>
-
-              <Status>{review.status}</Status>
-            </div>
-
-            <div className="ea-stars">
-              {"★".repeat(review.rating)}
-              <span>
-                {"★".repeat(5 - review.rating)}
-              </span>
-            </div>
-
-            <b className="ea-review-product">
-              {review.product}
-            </b>
-
-            <p>{review.text}</p>
-
-            <div className="ea-review-actions">
-              {review.status !== "Approved" && (
-                <button
-                  className="ea-btn primary"
-                  onClick={() =>
-                    change(review, "Approved")
-                  }
-                >
-                  Approve
-                </button>
-              )}
-
-              {review.status !== "Rejected" && (
-                <button
-                  className="ea-btn secondary"
-                  onClick={() =>
-                    change(review, "Rejected")
-                  }
-                >
-                  Reject
-                </button>
-              )}
-
-              <button
-                className="ea-btn danger"
-                onClick={() => remove(review)}
-              >
-                Delete
-              </button>
-            </div>
-          </article>
+      <div className="ad-tabs">
+        {[
+          "All",
+          "Pending",
+          "Approved",
+          "Rejected",
+        ].map((x) => (
+          <button
+            key={x}
+            className={
+              filter === x
+                ? "active"
+                : ""
+            }
+            onClick={() =>
+              setFilter(x)
+            }
+          >
+            {x}
+          </button>
         ))}
       </div>
 
-      {!reviews.length && (
-        <Empty title="No reviews here" />
+      {reviews.length ? (
+        <div className="ad-review-grid">
+          {reviews.map((review) => (
+            <article
+              className="ad-review-card"
+              key={review.id}
+            >
+              <div className="ad-review-head">
+                <div className="ad-review-avatar">
+                  {(review.author ||
+                    "C")
+                    .charAt(0)
+                    .toUpperCase()}
+                </div>
+
+                <div>
+                  <h3>
+                    {review.author ||
+                      "Customer"}
+                  </h3>
+
+                  <span>
+                    {dateText(
+                      review.time ||
+                        review.ts
+                    )}
+                  </span>
+                </div>
+
+                <Status
+                  value={
+                    review.status
+                  }
+                />
+              </div>
+
+              <div className="ad-stars">
+                <b>
+                  {"★".repeat(
+                    Number(
+                      review.rating ||
+                        0
+                    )
+                  )}
+                </b>
+
+                <span>
+                  {"★".repeat(
+                    Math.max(
+                      0,
+                      5 -
+                        Number(
+                          review.rating ||
+                            0
+                        )
+                    )
+                  )}
+                </span>
+              </div>
+
+              <span className="ad-review-product">
+                {review.product}
+              </span>
+
+              <p>
+                {review.text}
+              </p>
+
+              <div className="ad-review-actions">
+                {review.status !==
+                  "Approved" && (
+                  <button
+                    className="ad-btn ad-btn-primary"
+                    onClick={() =>
+                      setStatus(
+                        review,
+                        "Approved"
+                      )
+                    }
+                  >
+                    Approve
+                  </button>
+                )}
+
+                {review.status !==
+                  "Rejected" && (
+                  <button
+                    className="ad-btn ad-btn-light"
+                    onClick={() =>
+                      setStatus(
+                        review,
+                        "Rejected"
+                      )
+                    }
+                  >
+                    Reject
+                  </button>
+                )}
+
+                <button
+                  className="ad-btn ad-btn-danger"
+                  onClick={() =>
+                    remove(review)
+                  }
+                >
+                  Delete
+                </button>
+              </div>
+            </article>
+          ))}
+        </div>
+      ) : (
+        <section className="ad-card">
+          <Empty
+            icon="★"
+            title="No reviews"
+            text="Customer reviews will appear here."
+          />
+        </section>
       )}
     </>
   );
 }
 
 /* ============================================================
-   HERO / BANNER
+   HERO / BANNERS
 ============================================================ */
 
 function Hero({ data, update }) {
-  const add = () => {
-    const slide = {
+  const addBanner = () => {
+    const banner = {
       id: uid("HERO"),
       image: "",
-      title: "New season",
-      title2: "New style",
-      description: "",
+      title: "New collection",
+      title2: "Discover your style",
+      description:
+        "Explore our latest products.",
       cta: "Shop now",
       category: "All",
       active: true,
@@ -2278,224 +3480,433 @@ function Hero({ data, update }) {
 
     update(
       (state) => ({
-        hero: [...state.hero, slide],
+        hero: [
+          ...state.hero,
+          banner,
+        ],
       }),
-      "Hero slide added",
-      slide.title
+      "Hero banner added",
+      banner.title
     );
   };
 
-  const patch = (slide, changes) => {
+  const patch = (
+    banner,
+    changes,
+    log = true
+  ) => {
     update(
       (state) => ({
-        hero: state.hero.map((x) =>
-          x.id === slide.id ? { ...x, ...changes } : x
+        hero: state.hero.map(
+          (x) =>
+            x.id === banner.id
+              ? {
+                  ...x,
+                  ...changes,
+                }
+              : x
         ),
       }),
-      "Hero slide updated",
-      slide.title
+      log
+        ? "Hero banner updated"
+        : "Hero changed",
+      banner.title
     );
   };
 
-  const addImage = async (slide, file) => {
-    const image = await compressImage(file, 1600, 0.76);
+  const upload = async (
+    banner,
+    file
+  ) => {
+    if (!file) return;
 
-    if (image) patch(slide, { image });
+    const image =
+      await imageToDataURL(
+        file,
+        1800,
+        0.78
+      );
+
+    patch(banner, { image });
   };
 
-  const remove = (slide) => {
-    if (!window.confirm("Delete this hero slide?")) return;
+  const remove = (banner) => {
+    if (
+      !confirm(
+        "Delete this banner?"
+      )
+    )
+      return;
 
     update(
       (state) => ({
         hero: state.hero.filter(
-          (x) => x.id !== slide.id
+          (x) =>
+            x.id !== banner.id
         ),
       }),
-      "Hero slide deleted",
-      slide.title
+      "Hero banner deleted",
+      banner.title
     );
   };
 
-  const move = (index, direction) => {
-    const target = index + direction;
+  const move = (
+    index,
+    direction
+  ) => {
+    const target =
+      index + direction;
 
-    if (target < 0 || target >= data.hero.length) return;
+    if (
+      target < 0 ||
+      target >= data.hero.length
+    )
+      return;
 
     update(
       (state) => {
-        const hero = [...state.hero];
+        const hero = [
+          ...state.hero,
+        ];
 
-        [hero[index], hero[target]] = [
+        [
+          hero[index],
+          hero[target],
+        ] = [
           hero[target],
           hero[index],
         ];
 
         return { hero };
       },
-      "Hero reordered",
-      `Slide ${index + 1}`
+      "Hero order changed",
+      `Banner ${index + 1}`
     );
   };
 
   return (
     <>
-      <div className="ea-section-actions">
-        <p>
-          Manage the large banners shown at the top of your
-          storefront.
-        </p>
+      <div className="ad-section-intro">
+        <div>
+          <span className="ad-kicker">
+            STOREFRONT
+          </span>
+          <h2>
+            Hero slider management
+          </h2>
+          <p>
+            Upload promotional
+            images and manage the
+            homepage hero slider.
+          </p>
+        </div>
 
-        <button className="ea-btn primary" onClick={add}>
+        <button
+          className="ad-btn ad-btn-primary"
+          onClick={addBanner}
+        >
           ＋ Add banner
         </button>
       </div>
 
-      <div className="ea-hero-list">
-        {data.hero.map((slide, index) => (
-          <article className="ea-hero-card" key={slide.id}>
-            <div className="ea-hero-preview">
-              {slide.image ? (
-                <img src={slide.image} alt="" />
-              ) : (
-                <div className="ea-hero-empty">
-                  <b>16:9</b>
-                  <span>Add a banner image</span>
+      {data.hero.length ? (
+        <div className="ad-hero-list">
+          {data.hero.map(
+            (banner, index) => (
+              <article
+                className="ad-hero-card"
+                key={banner.id}
+              >
+                <div className="ad-hero-preview">
+                  {banner.image ? (
+                    <img
+                      src={
+                        banner.image
+                      }
+                      alt=""
+                    />
+                  ) : (
+                    <div className="ad-hero-placeholder">
+                      <span>
+                        ▧
+                      </span>
+                      <b>
+                        Banner image
+                      </b>
+                      <small>
+                        Recommended
+                        1600 × 900
+                      </small>
+                    </div>
+                  )}
+
+                  <label className="ad-upload-banner">
+                    {banner.image
+                      ? "Change image"
+                      : "Upload image"}
+
+                    <input
+                      hidden
+                      type="file"
+                      accept="image/*"
+                      onChange={(
+                        e
+                      ) => {
+                        upload(
+                          banner,
+                          e.target
+                            .files[0]
+                        );
+
+                        e.target.value =
+                          "";
+                      }}
+                    />
+                  </label>
+
+                  <div className="ad-banner-number">
+                    {String(
+                      index + 1
+                    ).padStart(
+                      2,
+                      "0"
+                    )}
+                  </div>
                 </div>
-              )}
 
-              <label className="ea-change-image">
-                {slide.image ? "Change image" : "Upload image"}
+                <div className="ad-hero-form">
+                  <div className="ad-card-head">
+                    <div>
+                      <span className="ad-kicker">
+                        BANNER{" "}
+                        {index + 1}
+                      </span>
 
-                <input
-                  hidden
-                  type="file"
-                  accept="image/*"
-                  onChange={(e) => {
-                    addImage(slide, e.target.files[0]);
-                    e.target.value = "";
-                  }}
-                />
-              </label>
-            </div>
+                      <h2>
+                        {banner.title ||
+                          "Untitled banner"}
+                      </h2>
+                    </div>
 
-            <div className="ea-hero-editor">
-              <div className="ea-card-head">
-                <div>
-                  <span className="ea-eyebrow">
-                    Banner {index + 1}
-                  </span>
-                  <h2>{slide.title || "Untitled"}</h2>
+                    <div className="ad-small-actions">
+                      <button
+                        disabled={
+                          index === 0
+                        }
+                        onClick={() =>
+                          move(
+                            index,
+                            -1
+                          )
+                        }
+                      >
+                        ↑
+                      </button>
+
+                      <button
+                        disabled={
+                          index ===
+                          data.hero
+                            .length -
+                            1
+                        }
+                        onClick={() =>
+                          move(
+                            index,
+                            1
+                          )
+                        }
+                      >
+                        ↓
+                      </button>
+
+                      <button
+                        className="danger"
+                        onClick={() =>
+                          remove(
+                            banner
+                          )
+                        }
+                      >
+                        ×
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="ad-form-grid">
+                    <Field label="Main headline">
+                      <input
+                        className="ad-input"
+                        defaultValue={
+                          banner.title
+                        }
+                        onBlur={(
+                          e
+                        ) =>
+                          patch(
+                            banner,
+                            {
+                              title:
+                                e
+                                  .target
+                                  .value,
+                            }
+                          )
+                        }
+                      />
+                    </Field>
+
+                    <Field label="Second headline">
+                      <input
+                        className="ad-input"
+                        defaultValue={
+                          banner.title2
+                        }
+                        onBlur={(
+                          e
+                        ) =>
+                          patch(
+                            banner,
+                            {
+                              title2:
+                                e
+                                  .target
+                                  .value,
+                            }
+                          )
+                        }
+                      />
+                    </Field>
+
+                    <Field label="CTA button">
+                      <input
+                        className="ad-input"
+                        defaultValue={
+                          banner.cta
+                        }
+                        onBlur={(
+                          e
+                        ) =>
+                          patch(
+                            banner,
+                            {
+                              cta:
+                                e
+                                  .target
+                                  .value,
+                            }
+                          )
+                        }
+                      />
+                    </Field>
+
+                    <Field label="CTA category">
+                      <select
+                        className="ad-input"
+                        value={
+                          banner.category ||
+                          "All"
+                        }
+                        onChange={(
+                          e
+                        ) =>
+                          patch(
+                            banner,
+                            {
+                              category:
+                                e
+                                  .target
+                                  .value,
+                            }
+                          )
+                        }
+                      >
+                        <option>
+                          All
+                        </option>
+
+                        {data.categories.map(
+                          (cat) => (
+                            <option
+                              key={
+                                cat.id
+                              }
+                            >
+                              {
+                                cat.name
+                              }
+                            </option>
+                          )
+                        )}
+                      </select>
+                    </Field>
+                  </div>
+
+                  <Field label="Description">
+                    <textarea
+                      className="ad-input"
+                      rows="3"
+                      defaultValue={
+                        banner.description
+                      }
+                      onBlur={(
+                        e
+                      ) =>
+                        patch(
+                          banner,
+                          {
+                            description:
+                              e
+                                .target
+                                .value,
+                          }
+                        )
+                      }
+                    />
+                  </Field>
+
+                  <div className="ad-visibility">
+                    <div>
+                      <b>
+                        Banner active
+                      </b>
+                      <span>
+                        Show this
+                        banner on the
+                        storefront.
+                      </span>
+                    </div>
+
+                    <Toggle
+                      value={
+                        banner.active !==
+                        false
+                      }
+                      onChange={(
+                        active
+                      ) =>
+                        patch(
+                          banner,
+                          {
+                            active,
+                          }
+                        )
+                      }
+                    />
+                  </div>
                 </div>
-
-                <div className="ea-row-buttons">
-                  <button
-                    className="ea-icon-btn"
-                    disabled={index === 0}
-                    onClick={() => move(index, -1)}
-                  >
-                    ↑
-                  </button>
-
-                  <button
-                    className="ea-icon-btn"
-                    disabled={
-                      index === data.hero.length - 1
-                    }
-                    onClick={() => move(index, 1)}
-                  >
-                    ↓
-                  </button>
-
-                  <button
-                    className="ea-icon-btn danger"
-                    onClick={() => remove(slide)}
-                  >
-                    ×
-                  </button>
-                </div>
-              </div>
-
-              <div className="ea-form-grid">
-                <Field label="Headline">
-                  <input
-                    className="ea-input"
-                    defaultValue={slide.title}
-                    onBlur={(e) =>
-                      patch(slide, {
-                        title: e.target.value,
-                      })
-                    }
-                  />
-                </Field>
-
-                <Field label="Second line">
-                  <input
-                    className="ea-input"
-                    defaultValue={slide.title2}
-                    onBlur={(e) =>
-                      patch(slide, {
-                        title2: e.target.value,
-                      })
-                    }
-                  />
-                </Field>
-
-                <Field label="Button text">
-                  <input
-                    className="ea-input"
-                    defaultValue={slide.cta}
-                    onBlur={(e) =>
-                      patch(slide, {
-                        cta: e.target.value,
-                      })
-                    }
-                  />
-                </Field>
-
-                <Field label="Button category">
-                  <select
-                    className="ea-input"
-                    value={slide.category || "All"}
-                    onChange={(e) =>
-                      patch(slide, {
-                        category: e.target.value,
-                      })
-                    }
-                  >
-                    <option>All</option>
-
-                    {data.categories.map((cat) => (
-                      <option key={cat.id}>
-                        {cat.name}
-                      </option>
-                    ))}
-                  </select>
-                </Field>
-              </div>
-
-              <Field label="Description">
-                <textarea
-                  className="ea-input"
-                  rows="3"
-                  defaultValue={slide.description}
-                  onBlur={(e) =>
-                    patch(slide, {
-                      description: e.target.value,
-                    })
-                  }
-                />
-              </Field>
-            </div>
-          </article>
-        ))}
-      </div>
-
-      {!data.hero.length && (
-        <Empty
-          title="No banners"
-          text="Create your first storefront banner."
-        />
+              </article>
+            )
+          )}
+        </div>
+      ) : (
+        <section className="ad-card">
+          <Empty
+            icon="▧"
+            title="No hero banners"
+            text="Add your first homepage banner."
+          />
+        </section>
       )}
     </>
   );
@@ -2505,19 +3916,23 @@ function Hero({ data, update }) {
    COUPONS
 ============================================================ */
 
-function Coupons({ data, update }) {
-  const initial = {
+function Coupons({
+  data,
+  update,
+}) {
+  const blank = {
     code: "",
-    type: "pct",
+    type: "percent",
     value: "",
     min: "",
     expires: "",
     limit: "",
   };
 
-  const [form, setForm] = useState(initial);
+  const [form, setForm] =
+    useState(blank);
 
-  const add = (e) => {
+  const create = (e) => {
     e.preventDefault();
 
     const code = form.code
@@ -2525,59 +3940,85 @@ function Coupons({ data, update }) {
       .toUpperCase()
       .replace(/\s+/g, "");
 
-    const value = Number(form.value);
+    const value = Number(
+      form.value || 0
+    );
 
     if (!code || value <= 0) {
-      return window.alert(
+      alert(
         "Enter a coupon code and discount value."
       );
+      return;
     }
 
     if (
       data.coupons.some(
-        (x) => x.code.toUpperCase() === code
+        (x) =>
+          x.code.toUpperCase() ===
+          code
       )
     ) {
-      return window.alert("Coupon already exists.");
+      alert(
+        "Coupon already exists."
+      );
+      return;
     }
 
-    if (form.type === "pct" && value > 100) {
-      return window.alert(
+    if (
+      form.type === "percent" &&
+      value > 100
+    ) {
+      alert(
         "Percentage cannot be over 100."
       );
+      return;
     }
 
     const coupon = {
-      id: uid("COUPON"),
+      id: uid("CP"),
       code,
       type: form.type,
       value,
-      min: Number(form.min || 0),
-      expires: form.expires,
-      limit: Number(form.limit || 0),
+      min: Number(
+        form.min || 0
+      ),
+      expires:
+        form.expires || "",
+      limit: Number(
+        form.limit || 0
+      ),
       used: 0,
       active: true,
     };
 
     update(
       (state) => ({
-        coupons: [coupon, ...state.coupons],
+        coupons: [
+          coupon,
+          ...state.coupons,
+        ],
       }),
       "Coupon created",
       coupon.code
     );
 
-    setForm(initial);
+    setForm(blank);
   };
 
   const toggle = (coupon) => {
     update(
       (state) => ({
-        coupons: state.coupons.map((x) =>
-          x.id === coupon.id
-            ? { ...x, active: !x.active }
-            : x
-        ),
+        coupons:
+          state.coupons.map(
+            (x) =>
+              x.id === coupon.id
+                ? {
+                    ...x,
+                    active:
+                      !x.active,
+                  }
+                : x
+          ),
       }),
       coupon.active
         ? "Coupon paused"
@@ -2587,13 +4028,20 @@ function Coupons({ data, update }) {
   };
 
   const remove = (coupon) => {
-    if (!window.confirm(`Delete ${coupon.code}?`)) return;
+    if (
+      !confirm(
+        `Delete coupon ${coupon.code}?`
+      )
+    )
+      return;
 
     update(
       (state) => ({
-        coupons: state.coupons.filter(
-          (x) => x.id !== coupon.id
-        ),
+        coupons:
+          state.coupons.filter(
+            (x) =>
+              x.id !== coupon.id
+          ),
       }),
       "Coupon deleted",
       coupon.code
@@ -2602,24 +4050,37 @@ function Coupons({ data, update }) {
 
   return (
     <>
-      <form className="ea-card" onSubmit={add}>
-        <div className="ea-card-head">
+      <form
+        className="ad-card"
+        onSubmit={create}
+      >
+        <div className="ad-card-head">
           <div>
-            <span className="ea-eyebrow">Promotion</span>
-            <h2>Create coupon</h2>
+            <span className="ad-kicker">
+              PROMOTIONS
+            </span>
+            <h2>
+              Create coupon
+            </h2>
+            <p>
+              Create percentage or
+              fixed discounts for
+              customers.
+            </p>
           </div>
         </div>
 
-        <div className="ea-form-grid coupon-grid">
+        <div className="ad-coupon-form">
           <Field label="Coupon code">
             <input
-              className="ea-input uppercase"
-              placeholder="SUMMER20"
+              className="ad-input uppercase"
+              placeholder="SAVE20"
               value={form.code}
               onChange={(e) =>
                 setForm({
                   ...form,
-                  code: e.target.value,
+                  code:
+                    e.target.value,
                 })
               }
             />
@@ -2627,36 +4088,44 @@ function Coupons({ data, update }) {
 
           <Field label="Discount type">
             <select
-              className="ea-input"
+              className="ad-input"
               value={form.type}
               onChange={(e) =>
                 setForm({
                   ...form,
-                  type: e.target.value,
+                  type:
+                    e.target.value,
                 })
               }
             >
-              <option value="pct">Percentage</option>
-              <option value="flat">Fixed amount</option>
+              <option value="percent">
+                Percentage
+              </option>
+
+              <option value="fixed">
+                Fixed amount
+              </option>
             </select>
           </Field>
 
           <Field
             label={
-              form.type === "pct"
+              form.type ===
+              "percent"
                 ? "Discount %"
                 : "Discount ৳"
             }
           >
             <input
-              className="ea-input"
+              className="ad-input"
               type="number"
               min="0"
               value={form.value}
               onChange={(e) =>
                 setForm({
                   ...form,
-                  value: e.target.value,
+                  value:
+                    e.target.value,
                 })
               }
             />
@@ -2664,28 +4133,30 @@ function Coupons({ data, update }) {
 
           <Field label="Minimum order">
             <input
-              className="ea-input"
+              className="ad-input"
               type="number"
               min="0"
               value={form.min}
               onChange={(e) =>
                 setForm({
                   ...form,
-                  min: e.target.value,
+                  min:
+                    e.target.value,
                 })
               }
             />
           </Field>
 
-          <Field label="Expiry">
+          <Field label="Expiry date">
             <input
-              className="ea-input"
+              className="ad-input"
               type="date"
               value={form.expires}
               onChange={(e) =>
                 setForm({
                   ...form,
-                  expires: e.target.value,
+                  expires:
+                    e.target.value,
                 })
               }
             />
@@ -2693,7 +4164,7 @@ function Coupons({ data, update }) {
 
           <Field label="Usage limit">
             <input
-              className="ea-input"
+              className="ad-input"
               type="number"
               min="0"
               placeholder="0 = unlimited"
@@ -2701,85 +4172,132 @@ function Coupons({ data, update }) {
               onChange={(e) =>
                 setForm({
                   ...form,
-                  limit: e.target.value,
+                  limit:
+                    e.target.value,
                 })
               }
             />
           </Field>
         </div>
 
-        <button className="ea-btn primary">
+        <button className="ad-btn ad-btn-primary">
           Create coupon
         </button>
       </form>
 
-      <div className="ea-coupon-grid">
-        {data.coupons.map((coupon) => (
-          <article className="ea-coupon" key={coupon.id}>
-            <div className="ea-coupon-side">
-              <span>EVER STYLE</span>
-              <b>%</b>
-            </div>
-
-            <div className="ea-coupon-content">
-              <div className="ea-card-head">
-                <div>
-                  <span className="ea-eyebrow">
-                    Coupon code
+      {data.coupons.length ? (
+        <div className="ad-coupon-grid">
+          {data.coupons.map(
+            (coupon) => (
+              <article
+                className="ad-coupon"
+                key={coupon.id}
+              >
+                <div className="ad-coupon-strip">
+                  <span>
+                    EVER STYLE
                   </span>
-                  <h2>{coupon.code}</h2>
+                  <b>%</b>
                 </div>
 
-                <Status>
-                  {coupon.active ? "Active" : "Paused"}
-                </Status>
-              </div>
+                <div className="ad-coupon-main">
+                  <div className="ad-card-head">
+                    <div>
+                      <span className="ad-kicker">
+                        COUPON
+                      </span>
 
-              <strong className="ea-discount">
-                {coupon.type === "pct"
-                  ? `${coupon.value}% OFF`
-                  : `${money(coupon.value)} OFF`}
-              </strong>
+                      <h2>
+                        {
+                          coupon.code
+                        }
+                      </h2>
+                    </div>
 
-              <div className="ea-coupon-info">
-                <span>
-                  Minimum:{" "}
-                  {coupon.min
-                    ? money(coupon.min)
-                    : "None"}
-                </span>
+                    <Status
+                      value={
+                        coupon.active
+                          ? "Active"
+                          : "Paused"
+                      }
+                    />
+                  </div>
 
-                <span>
-                  Used: {coupon.used || 0}
-                  {coupon.limit
-                    ? ` / ${coupon.limit}`
-                    : ""}
-                </span>
+                  <strong className="ad-discount">
+                    {coupon.type ===
+                      "percent" ||
+                    coupon.type ===
+                      "pct"
+                      ? `${coupon.value}% OFF`
+                      : `${money(
+                          coupon.value
+                        )} OFF`}
+                  </strong>
 
-                <span>
-                  Expiry: {coupon.expires || "No expiry"}
-                </span>
-              </div>
+                  <div className="ad-coupon-details">
+                    <span>
+                      Minimum:{" "}
+                      {coupon.min
+                        ? money(
+                            coupon.min
+                          )
+                        : "None"}
+                    </span>
 
-              <div className="ea-row-buttons">
-                <button
-                  className="ea-btn secondary"
-                  onClick={() => toggle(coupon)}
-                >
-                  {coupon.active ? "Pause" : "Activate"}
-                </button>
+                    <span>
+                      Used:{" "}
+                      {coupon.used ||
+                        0}
+                      {coupon.limit
+                        ? ` / ${coupon.limit}`
+                        : ""}
+                    </span>
 
-                <button
-                  className="ea-btn danger"
-                  onClick={() => remove(coupon)}
-                >
-                  Delete
-                </button>
-              </div>
-            </div>
-          </article>
-        ))}
-      </div>
+                    <span>
+                      Expiry:{" "}
+                      {coupon.expires ||
+                        "No expiry"}
+                    </span>
+                  </div>
+
+                  <div className="ad-row-actions">
+                    <button
+                      className="ad-btn ad-btn-light"
+                      onClick={() =>
+                        toggle(
+                          coupon
+                        )
+                      }
+                    >
+                      {coupon.active
+                        ? "Pause"
+                        : "Activate"}
+                    </button>
+
+                    <button
+                      className="ad-btn ad-btn-danger"
+                      onClick={() =>
+                        remove(
+                          coupon
+                        )
+                      }
+                    >
+                      Delete
+                    </button>
+                  </div>
+                </div>
+              </article>
+            )
+          )}
+        </div>
+      ) : (
+        <section className="ad-card">
+          <Empty
+            title="No coupons"
+            text="Create your first discount coupon."
+          />
+        </section>
+      )}
     </>
   );
 }
@@ -2788,39 +4306,52 @@ function Coupons({ data, update }) {
    TEAM
 ============================================================ */
 
-function Team({ data, update, currentUser }) {
-  const empty = {
+function Team({
+  data,
+  update,
+  currentUser,
+}) {
+  const blank = {
     name: "",
     email: "",
     role: "Support",
     pass: "",
   };
 
-  const [form, setForm] = useState(empty);
+  const [form, setForm] =
+    useState(blank);
 
   const add = (e) => {
     e.preventDefault();
 
-    const email = form.email.trim().toLowerCase();
+    const email = form.email
+      .trim()
+      .toLowerCase();
 
     if (
       !form.name.trim() ||
       !email.includes("@") ||
       form.pass.length < 6
     ) {
-      return window.alert(
-        "Enter name, valid email and a password with at least 6 characters."
+      alert(
+        "Enter name, valid email and at least 6 character passcode."
       );
+      return;
     }
 
     if (
       data.team.some(
-        (x) => x.email.toLowerCase() === email
+        (x) =>
+          String(
+            x.email || ""
+          ).toLowerCase() ===
+          email
       )
     ) {
-      return window.alert(
+      alert(
         "This email already has access."
       );
+      return;
     }
 
     const member = {
@@ -2834,22 +4365,33 @@ function Team({ data, update, currentUser }) {
 
     update(
       (state) => ({
-        team: [...state.team, member],
+        team: [
+          ...state.team,
+          member,
+        ],
       }),
       "Team member added",
       `${member.name} · ${member.role}`
     );
 
-    setForm(empty);
+    setForm(blank);
   };
 
-  const patch = (member, changes, action) => {
+  const patch = (
+    member,
+    changes,
+    action
+  ) => {
     update(
       (state) => ({
-        team: state.team.map((x) =>
-          x.id === member.id
-            ? { ...x, ...changes }
-            : x
+        team: state.team.map(
+          (x) =>
+            x.id === member.id
+              ? {
+                  ...x,
+                  ...changes,
+                }
+              : x
         ),
       }),
       action,
@@ -2858,24 +4400,37 @@ function Team({ data, update, currentUser }) {
   };
 
   const remove = (member) => {
-    if (member.id === currentUser.id) {
-      return window.alert(
-        "You cannot remove your own account."
+    if (
+      member.id === OWNER.id
+    ) {
+      alert(
+        "Primary Owner cannot be removed."
       );
+      return;
     }
 
-    if (member.role === "Owner") {
-      return window.alert(
-        "The primary Owner account cannot be removed here."
+    if (
+      member.id ===
+      currentUser.id
+    ) {
+      alert(
+        "You cannot remove yourself."
       );
+      return;
     }
 
-    if (!window.confirm(`Remove ${member.name}?`)) return;
+    if (
+      !confirm(
+        `Remove ${member.name}?`
+      )
+    )
+      return;
 
     update(
       (state) => ({
         team: state.team.filter(
-          (x) => x.id !== member.id
+          (x) =>
+            x.id !== member.id
         ),
       }),
       "Team member removed",
@@ -2885,23 +4440,35 @@ function Team({ data, update, currentUser }) {
 
   return (
     <>
-      <form className="ea-card" onSubmit={add}>
-        <div className="ea-card-head">
+      <form
+        className="ad-card"
+        onSubmit={add}
+      >
+        <div className="ad-card-head">
           <div>
-            <span className="ea-eyebrow">Permissions</span>
-            <h2>Add team member</h2>
+            <span className="ad-kicker">
+              ACCESS CONTROL
+            </span>
+            <h2>
+              Add team member
+            </h2>
+            <p>
+              Give staff access with
+              role-based permissions.
+            </p>
           </div>
         </div>
 
-        <div className="ea-form-grid">
+        <div className="ad-form-grid">
           <Field label="Full name">
             <input
-              className="ea-input"
+              className="ad-input"
               value={form.name}
               onChange={(e) =>
                 setForm({
                   ...form,
-                  name: e.target.value,
+                  name:
+                    e.target.value,
                 })
               }
             />
@@ -2909,13 +4476,14 @@ function Team({ data, update, currentUser }) {
 
           <Field label="Email">
             <input
-              className="ea-input"
+              className="ad-input"
               type="email"
               value={form.email}
               onChange={(e) =>
                 setForm({
                   ...form,
-                  email: e.target.value,
+                  email:
+                    e.target.value,
                 })
               }
             />
@@ -2923,316 +4491,437 @@ function Team({ data, update, currentUser }) {
 
           <Field label="Role">
             <select
-              className="ea-input"
+              className="ad-input"
               value={form.role}
               onChange={(e) =>
                 setForm({
                   ...form,
-                  role: e.target.value,
+                  role:
+                    e.target.value,
                 })
               }
             >
-              {Object.keys(ROLES).map((role) => (
-                <option key={role}>{role}</option>
+              {Object.keys(
+                PERMISSIONS
+              ).map((role) => (
+                <option
+                  key={role}
+                >
+                  {role}
+                </option>
               ))}
             </select>
           </Field>
 
           <Field label="Passcode">
             <input
-              className="ea-input"
+              className="ad-input"
               type="password"
               value={form.pass}
               onChange={(e) =>
                 setForm({
                   ...form,
-                  pass: e.target.value,
+                  pass:
+                    e.target.value,
                 })
               }
             />
           </Field>
         </div>
 
-        <button className="ea-btn primary">
+        <button className="ad-btn ad-btn-primary">
           ＋ Add member
         </button>
       </form>
 
-      <div className="ea-team-grid">
-        {data.team.map((member) => (
-          <article className="ea-team-card" key={member.id}>
-            <div className="ea-team-avatar">
-              {member.name?.[0]?.toUpperCase()}
-            </div>
+      <div className="ad-team-list">
+        {data.team.map(
+          (member) => (
+            <article
+              className="ad-team-member"
+              key={member.id}
+            >
+              <div className="ad-team-avatar">
+                {member.name
+                  ?.charAt(0)
+                  .toUpperCase() ||
+                  "U"}
+              </div>
 
-            <div className="ea-team-info">
-              <h3>
-                {member.name}
-                {member.id === currentUser.id && (
-                  <small> You</small>
-                )}
-              </h3>
+              <div className="ad-team-info">
+                <h3>
+                  {member.name}
 
-              <span>{member.email}</span>
+                  {member.id ===
+                    currentUser.id && (
+                    <small>
+                      {" "}
+                      You
+                    </small>
+                  )}
+                </h3>
 
-              <Status>
-                {member.active ? "Active" : "Paused"}
-              </Status>
-            </div>
+                <span>
+                  {member.email}
+                </span>
+              </div>
 
-            <div className="ea-team-controls">
-              <select
-                className="ea-input"
-                value={member.role}
-                disabled={member.id === OWNER.id}
-                onChange={(e) =>
-                  patch(
-                    member,
-                    { role: e.target.value },
-                    "Team role updated"
-                  )
+              <Status
+                value={
+                  member.active
+                    ? "Active"
+                    : "Paused"
                 }
-              >
-                {Object.keys(ROLES).map((role) => (
-                  <option key={role}>{role}</option>
-                ))}
-              </select>
+              />
 
-              {member.id !== OWNER.id && (
-                <button
-                  className="ea-btn secondary"
-                  onClick={() =>
+              <div className="ad-team-actions">
+                <select
+                  className="ad-select"
+                  value={
+                    member.role
+                  }
+                  disabled={
+                    member.id ===
+                    OWNER.id
+                  }
+                  onChange={(e) =>
                     patch(
                       member,
-                      { active: !member.active },
-                      member.active
-                        ? "Team access paused"
-                        : "Team access restored"
+                      {
+                        role:
+                          e.target
+                            .value,
+                      },
+                      "Team role updated"
                     )
                   }
                 >
-                  {member.active ? "Pause" : "Restore"}
-                </button>
-              )}
+                  {Object.keys(
+                    PERMISSIONS
+                  ).map((role) => (
+                    <option
+                      key={role}
+                    >
+                      {role}
+                    </option>
+                  ))}
+                </select>
 
-              {member.id !== OWNER.id && (
-                <button
-                  className="ea-btn danger"
-                  onClick={() => remove(member)}
-                >
-                  Remove
-                </button>
-              )}
-            </div>
-          </article>
-        ))}
+                {member.id !==
+                  OWNER.id && (
+                  <button
+                    className="ad-btn ad-btn-light"
+                    onClick={() =>
+                      patch(
+                        member,
+                        {
+                          active:
+                            !member.active,
+                        },
+                        member.active
+                          ? "Team access paused"
+                          : "Team access restored"
+                      )
+                    }
+                  >
+                    {member.active
+                      ? "Pause"
+                      : "Restore"}
+                  </button>
+                )}
+
+                {member.id !==
+                  OWNER.id && (
+                  <button
+                    className="ad-btn ad-btn-danger"
+                    onClick={() =>
+                      remove(
+                        member
+                      )
+                    }
+                  >
+                    Remove
+                  </button>
+                )}
+              </div>
+            </article>
+          )
+        )}
       </div>
 
-      <div className="ea-card">
-        <div className="ea-card-head">
+      <section className="ad-card">
+        <div className="ad-card-head">
           <div>
-            <span className="ea-eyebrow">
-              Access control
+            <span className="ad-kicker">
+              PERMISSIONS
             </span>
-            <h2>Role permissions</h2>
+            <h2>
+              Role permissions
+            </h2>
           </div>
         </div>
 
-        {Object.entries(ROLES).map(([role, tabs]) => (
-          <div className="ea-permission" key={role}>
-            <b>{role}</b>
+        {Object.entries(
+          PERMISSIONS
+        ).map(
+          ([role, pages]) => (
+            <div
+              className="ad-permission-row"
+              key={role}
+            >
+              <b>{role}</b>
 
-            <span>
-              {tabs
-                .map(
-                  (id) =>
-                    NAV.find((x) => x.id === id)?.label
-                )
-                .filter(Boolean)
-                .join(" · ")}
-            </span>
-          </div>
-        ))}
-      </div>
+              <span>
+                {pages
+                  .map(
+                    (page) =>
+                      NAV.find(
+                        (x) =>
+                          x[0] ===
+                          page
+                      )?.[1]
+                  )
+                  .filter(Boolean)
+                  .join(" · ")}
+              </span>
+            </div>
+          )
+        )}
+      </section>
     </>
   );
 }
 
 /* ============================================================
-   AUDIT
+   AUDIT LOG
 ============================================================ */
 
 function Audit({ data }) {
-  const [query, setQuery] = useState("");
+  const [search, setSearch] =
+    useState("");
 
-  const logs = data.logs.filter((log) =>
-    `${log.action} ${log.detail} ${log.who}`
-      .toLowerCase()
-      .includes(query.trim().toLowerCase())
+  const logs = data.logs.filter(
+    (log) =>
+      `${log.action} ${log.detail} ${log.who}`
+        .toLowerCase()
+        .includes(
+          search
+            .trim()
+            .toLowerCase()
+        )
   );
 
   return (
     <>
-      <div className="ea-toolbar">
-        <div className="ea-search">
+      <div className="ad-toolbar">
+        <div className="ad-search">
           <span>⌕</span>
 
           <input
             placeholder="Search activity..."
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
+            value={search}
+            onChange={(e) =>
+              setSearch(e.target.value)
+            }
           />
         </div>
       </div>
 
-      <div className="ea-card">
-        <div className="ea-timeline">
-          {logs.map((log) => (
-            <div className="ea-timeline-item" key={log.id}>
-              <div className="ea-timeline-dot" />
-
-              <div className="ea-timeline-content">
-                <div>
-                  <b>{log.action}</b>
-                  <span>{formatDate(log.time)}</span>
+      <section className="ad-card">
+        {logs.length ? (
+          <div className="ad-timeline">
+            {logs.map((log) => (
+              <div
+                className="ad-log"
+                key={log.id}
+              >
+                <div className="ad-log-line">
+                  <span />
                 </div>
 
-                <p>{log.detail}</p>
+                <div className="ad-log-content">
+                  <div>
+                    <h3>
+                      {log.action}
+                    </h3>
 
-                <small>By {log.who}</small>
+                    <time>
+                      {dateText(
+                        log.time
+                      )}
+                    </time>
+                  </div>
+
+                  <p>
+                    {log.detail}
+                  </p>
+
+                  <small>
+                    By {log.who}
+                  </small>
+                </div>
               </div>
-            </div>
-          ))}
-        </div>
-
-        {!logs.length && (
-          <Empty title="No activity found" />
+            ))}
+          </div>
+        ) : (
+          <Empty
+            icon="◷"
+            title="No activity found"
+          />
         )}
-      </div>
+      </section>
     </>
   );
 }
 
 /* ============================================================
-   PANEL LAYOUT
+   PAGE TITLES
 ============================================================ */
 
 const TITLES = {
-  dashboard: [
-    "Dashboard",
-    "Here’s what’s happening with your store.",
-  ],
-  orders: [
-    "Orders",
-    "Manage orders, payments and delivery status.",
-  ],
-  products: [
-    "Products",
-    "Create and manage your product catalog.",
-  ],
-  inventory: [
-    "Inventory",
-    "Track stock and low inventory levels.",
-  ],
-  categories: [
-    "Categories",
-    "Organize products and sub-categories.",
-  ],
-  customers: [
-    "Customers",
-    "View customers and purchase history.",
-  ],
-  reviews: [
-    "Reviews",
-    "Moderate customer product reviews.",
-  ],
-  hero: [
-    "Hero & Banners",
-    "Manage your storefront promotional banners.",
-  ],
-  coupons: [
-    "Coupons",
-    "Create discounts and promotional codes.",
-  ],
-  team: [
-    "Team Access",
-    "Manage staff roles and permissions.",
-  ],
-  audit: [
-    "Audit Log",
-    "Review important admin activity.",
-  ],
+  dashboard: {
+    title: "Dashboard",
+    text: "A complete overview of your Ever Style store.",
+  },
+
+  orders: {
+    title: "Orders",
+    text: "Manage customer orders, payments and fulfilment.",
+  },
+
+  products: {
+    title: "Products",
+    text: "Manage your product catalog, pricing and images.",
+  },
+
+  inventory: {
+    title: "Inventory",
+    text: "Track stock quantities and low-stock alerts.",
+  },
+
+  categories: {
+    title: "Categories",
+    text: "Organize products into categories and sub-categories.",
+  },
+
+  customers: {
+    title: "Customers",
+    text: "View customer profiles, spending and order history.",
+  },
+
+  reviews: {
+    title: "Reviews",
+    text: "Moderate and manage customer product reviews.",
+  },
+
+  hero: {
+    title: "Hero & Banners",
+    text: "Control the promotional content on your storefront.",
+  },
+
+  coupons: {
+    title: "Coupons",
+    text: "Create and manage promotional discount codes.",
+  },
+
+  team: {
+    title: "Team Access",
+    text: "Manage staff accounts, roles and permissions.",
+  },
+
+  audit: {
+    title: "Audit Log",
+    text: "Track important changes made inside the admin panel.",
+  },
 };
 
-function AdminPanel({
+/* ============================================================
+   MAIN PANEL
+============================================================ */
+
+function Panel({
   products,
   cats,
   slides,
-  userId,
+  meId,
   onBack,
-  onLogout,
+  logout,
 }) {
-  const [data, setData] = useState(() =>
-    loadData(products, cats, slides)
+  const [data, setData] =
+    useState(() =>
+      readData(
+        products,
+        cats,
+        slides
+      )
+    );
+
+  const [page, setPage] =
+    useState("dashboard");
+
+  const [mobileMenu, setMobileMenu] =
+    useState(false);
+
+  const [storageWarning, setStorageWarning] =
+    useState(false);
+
+  const me = data.team.find(
+    (x) => x.id === meId
   );
 
-  const [tab, setTab] = useState("dashboard");
-  const [menu, setMenu] = useState(false);
-  const [storageError, setStorageError] = useState(false);
-
-  const currentUser = data.team.find(
-    (x) => x.id === userId
-  );
-
-  const permissions =
-    ROLES[currentUser?.role] || [];
-
-  const activeTab = permissions.includes(tab)
-    ? tab
-    : "dashboard";
+  const allowed =
+    PERMISSIONS[me?.role] || [];
 
   useEffect(() => {
-    try {
-      localStorage.setItem(KEY, JSON.stringify(data));
-      setStorageError(false);
-    } catch {
-      setStorageError(true);
+    if (!me || !me.active) {
+      logout();
     }
+  }, [me, logout]);
+
+  useEffect(() => {
+    const ok = saveStored(data);
+
+    setStorageWarning(!ok);
   }, [data]);
 
-  useEffect(() => {
-    if (!currentUser || !currentUser.active) {
-      onLogout();
-    }
-  }, [currentUser, onLogout]);
+  if (!me) return null;
 
-  if (!currentUser) return null;
+  const currentPage =
+    allowed.includes(page)
+      ? page
+      : "dashboard";
 
-  const update = (callback, action, detail) => {
-    setData((previous) => {
-      const changes = callback(previous);
+  const go = (id) => {
+    if (!allowed.includes(id))
+      return;
+
+    setPage(id);
+    setMobileMenu(false);
+  };
+
+  const update = (
+    callback,
+    action,
+    detail
+  ) => {
+    setData((old) => {
+      const changes =
+        callback(old) || {};
 
       return {
-        ...previous,
+        ...old,
         ...changes,
 
         logs: [
-          logEntry(
+          logItem(
             action,
             detail,
-            currentUser.name
+            me.name
           ),
-          ...(previous.logs || []),
+          ...(old.logs || []),
         ].slice(0, 500),
       };
     });
-  };
-
-  const navigate = (id) => {
-    if (!permissions.includes(id)) return;
-
-    setTab(id);
-    setMenu(false);
   };
 
   const groups = [
@@ -3243,198 +4932,300 @@ function AdminPanel({
     "System",
   ];
 
+  const title =
+    TITLES[currentPage];
+
+  const pending =
+    data.orders.filter(
+      (x) => x.status === "Pending"
+    ).length;
+
   return (
-    <div className="ea-admin">
-      {menu && (
+    <div className="ad-shell">
+      {mobileMenu && (
         <button
-          className="ea-overlay"
-          onClick={() => setMenu(false)}
+          className="ad-mobile-overlay"
+          onClick={() =>
+            setMobileMenu(false)
+          }
         />
       )}
 
       <aside
-        className={`ea-sidebar ${
-          menu ? "mobile-open" : ""
+        className={`ad-sidebar ${
+          mobileMenu
+            ? "ad-sidebar-open"
+            : ""
         }`}
       >
-        <div className="ea-brand">
-          <div className="ea-logo">ES</div>
+        <div className="ad-brand">
+          <div className="ad-brand-mark">
+            ES
+          </div>
 
           <div>
-            <b>EVER STYLE</b>
-            <span>Admin Console</span>
+            <strong>
+              EVER STYLE
+            </strong>
+            <span>
+              ADMIN CONSOLE
+            </span>
           </div>
         </div>
 
-        <nav className="ea-nav">
+        <nav className="ad-nav">
           {groups.map((group) => {
-            const links = NAV.filter(
-              (item) =>
-                item.group === group &&
-                permissions.includes(item.id)
-            );
+            const items =
+              NAV.filter(
+                (x) =>
+                  x[3] === group &&
+                  allowed.includes(
+                    x[0]
+                  )
+              );
 
-            if (!links.length) return null;
+            if (!items.length)
+              return null;
 
             return (
-              <div className="ea-nav-group" key={group}>
-                <span className="ea-nav-label">
+              <div
+                className="ad-nav-group"
+                key={group}
+              >
+                <span className="ad-nav-title">
                   {group}
                 </span>
 
-                {links.map((item) => (
-                  <button
-                    key={item.id}
-                    className={
-                      activeTab === item.id
-                        ? "active"
-                        : ""
-                    }
-                    onClick={() => navigate(item.id)}
-                  >
-                    <Icon>{item.icon}</Icon>
-                    <span>{item.label}</span>
+                {items.map(
+                  ([
+                    id,
+                    label,
+                    icon,
+                  ]) => (
+                    <button
+                      key={id}
+                      className={
+                        currentPage ===
+                        id
+                          ? "active"
+                          : ""
+                      }
+                      onClick={() =>
+                        go(id)
+                      }
+                    >
+                      <span className="ad-nav-icon">
+                        {icon}
+                      </span>
 
-                    {item.id === "orders" &&
-                      data.orders.filter(
-                        (x) => x.status === "Pending"
-                      ).length > 0 && (
-                        <em>
-                          {
-                            data.orders.filter(
-                              (x) =>
-                                x.status === "Pending"
-                            ).length
-                          }
-                        </em>
-                      )}
-                  </button>
-                ))}
+                      <span>
+                        {label}
+                      </span>
+
+                      {id ===
+                        "orders" &&
+                        pending >
+                          0 && (
+                          <em>
+                            {
+                              pending
+                            }
+                          </em>
+                        )}
+                    </button>
+                  )
+                )}
               </div>
             );
           })}
         </nav>
 
-        <div className="ea-sidebar-bottom">
+        <div className="ad-sidebar-footer">
           <button
-            className="ea-store-btn"
+            className="ad-view-store"
             onClick={onBack}
           >
-            ↗
-            <span>
-              <b>View storefront</b>
-              <small>Open customer website</small>
+            <span className="ad-view-icon">
+              ↗
             </span>
+
+            <div>
+              <b>
+                View storefront
+              </b>
+              <small>
+                Open Ever Style
+              </small>
+            </div>
           </button>
 
-          <div className="ea-user">
-            <div className="ea-avatar">
-              {currentUser.name?.[0]?.toUpperCase()}
+          <div className="ad-admin-user">
+            <div className="ad-admin-avatar">
+              {me.name
+                ?.charAt(0)
+                .toUpperCase()}
             </div>
 
             <div>
-              <b>{currentUser.name}</b>
-              <span>{currentUser.role}</span>
+              <b>{me.name}</b>
+              <span>{me.role}</span>
             </div>
 
-            <button onClick={onLogout}>↪</button>
+            <button
+              title="Sign out"
+              onClick={logout}
+            >
+              ↪
+            </button>
           </div>
         </div>
       </aside>
 
-      <main className="ea-main">
-        <header className="ea-header">
-          <div className="ea-header-left">
+      <main className="ad-main">
+        <header className="ad-header">
+          <div className="ad-header-left">
             <button
-              className="ea-menu-btn"
-              onClick={() => setMenu(true)}
+              className="ad-menu-button"
+              onClick={() =>
+                setMobileMenu(true)
+              }
             >
               ☰
             </button>
 
             <div>
-              <h1>{TITLES[activeTab][0]}</h1>
-              <p>{TITLES[activeTab][1]}</p>
+              <span className="ad-header-kicker">
+                EVER STYLE / ADMIN
+              </span>
+
+              <h1>
+                {title.title}
+              </h1>
+
+              <p>
+                {title.text}
+              </p>
             </div>
           </div>
 
-          <div className="ea-header-actions">
+          <div className="ad-header-right">
             <button
-              className="ea-btn secondary desktop-shop"
+              className="ad-store-button"
               onClick={onBack}
             >
-              View shop ↗
+              View store
+              <span>↗</span>
             </button>
 
-            <div className="ea-header-user">
-              <div className="ea-avatar">
-                {currentUser.name?.[0]?.toUpperCase()}
+            <div className="ad-header-profile">
+              <div>
+                {me.name
+                  ?.charAt(0)
+                  .toUpperCase()}
               </div>
 
-              <div>
-                <b>{currentUser.name}</b>
-                <span>{currentUser.role}</span>
-              </div>
+              <span>
+                <b>{me.name}</b>
+                <small>
+                  {me.role}
+                </small>
+              </span>
             </div>
           </div>
         </header>
 
-        <div className="ea-content">
-          {storageError && (
-            <div className="ea-alert">
-              Browser storage is full. Remove some uploaded
-              images before making more changes.
+        <div className="ad-content">
+          {storageWarning && (
+            <div className="ad-warning">
+              Browser storage is
+              almost/full. Remove some
+              uploaded images before
+              adding more.
             </div>
           )}
 
-          {activeTab === "dashboard" && (
+          {currentPage ===
+            "dashboard" && (
             <Dashboard
               data={data}
-              setTab={navigate}
+              go={go}
             />
           )}
 
-          {activeTab === "orders" && (
-            <Orders data={data} update={update} />
+          {currentPage ===
+            "orders" && (
+            <Orders
+              data={data}
+              update={update}
+            />
           )}
 
-          {activeTab === "products" && (
-            <Products data={data} update={update} />
+          {currentPage ===
+            "products" && (
+            <Products
+              data={data}
+              update={update}
+            />
           )}
 
-          {activeTab === "inventory" && (
-            <Inventory data={data} update={update} />
+          {currentPage ===
+            "inventory" && (
+            <Inventory
+              data={data}
+              update={update}
+            />
           )}
 
-          {activeTab === "categories" && (
-            <Categories data={data} update={update} />
+          {currentPage ===
+            "categories" && (
+            <Categories
+              data={data}
+              update={update}
+            />
           )}
 
-          {activeTab === "customers" && (
-            <Customers data={data} />
+          {currentPage ===
+            "customers" && (
+            <Customers
+              data={data}
+            />
           )}
 
-          {activeTab === "reviews" && (
-            <Reviews data={data} update={update} />
+          {currentPage ===
+            "reviews" && (
+            <Reviews
+              data={data}
+              update={update}
+            />
           )}
 
-          {activeTab === "hero" && (
-            <Hero data={data} update={update} />
+          {currentPage ===
+            "hero" && (
+            <Hero
+              data={data}
+              update={update}
+            />
           )}
 
-          {activeTab === "coupons" && (
-            <Coupons data={data} update={update} />
+          {currentPage ===
+            "coupons" && (
+            <Coupons
+              data={data}
+              update={update}
+            />
           )}
 
-          {activeTab === "team" && (
+          {currentPage ===
+            "team" && (
             <Team
               data={data}
               update={update}
-              currentUser={currentUser}
+              currentUser={me}
             />
           )}
 
-          {activeTab === "audit" && (
+          {currentPage ===
+            "audit" && (
             <Audit data={data} />
           )}
         </div>
@@ -3444,7 +5235,7 @@ function AdminPanel({
 }
 
 /* ============================================================
-   LOGIN
+   ADMIN LOGIN
 ============================================================ */
 
 export default function Admin({
@@ -3453,76 +5244,101 @@ export default function Admin({
   slides = [],
   onBack = () => {},
 }) {
-  const [userId, setUserId] = useState(() => {
-    try {
-      return sessionStorage.getItem(SESSION_KEY) || "";
-    } catch {
-      return "";
-    }
-  });
+  const [meId, setMeId] =
+    useState(() => {
+      try {
+        return (
+          sessionStorage.getItem(
+            OK
+          ) || ""
+        );
+      } catch {
+        return "";
+      }
+    });
 
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [error, setError] = useState(false);
+  const [email, setEmail] =
+    useState("");
+
+  const [pass, setPass] =
+    useState("");
+
+  const [error, setError] =
+    useState(false);
+
+  const [showPass, setShowPass] =
+    useState(false);
 
   useEffect(() => {
-    const data = loadData(products, cats, slides);
+    const data = readData(
+      products,
+      cats,
+      slides
+    );
 
-    try {
-      localStorage.setItem(
-        KEY,
-        JSON.stringify(ensureOwner(data))
-      );
-    } catch {}
-  }, []);
+    saveStored(
+      repairOwner(data)
+    );
+  }, [products, cats, slides]);
 
   const login = (e) => {
     e.preventDefault();
 
-    const data = ensureOwner(
-      getStored() || createSeed(products, cats, slides)
+    const data = repairOwner(
+      readData(
+        products,
+        cats,
+        slides
+      )
     );
 
-    try {
-      localStorage.setItem(KEY, JSON.stringify(data));
-    } catch {}
+    saveStored(data);
 
-    const inputEmail = email.trim().toLowerCase();
+    const em = email
+      .trim()
+      .toLowerCase();
 
-    const user = inputEmail
+    const user = em
       ? data.team.find(
           (x) =>
-            x.email.toLowerCase() === inputEmail &&
+            String(
+              x.email || ""
+            ).toLowerCase() ===
+              em &&
             x.active
         )
       : data.team.find(
-          (x) => x.role === "Owner" && x.active
+          (x) =>
+            x.role === "Owner" &&
+            x.active
         );
 
-    if (user && password === user.pass) {
+    if (
+      user &&
+      pass === user.pass
+    ) {
       try {
         sessionStorage.setItem(
-          SESSION_KEY,
+          OK,
           user.id
         );
       } catch {}
 
       data.logs = [
-        logEntry(
+        logItem(
           "Signed in",
-          "Admin panel opened",
+          "Admin panel opened.",
           user.name
         ),
         ...(data.logs || []),
       ];
 
-      try {
-        localStorage.setItem(KEY, JSON.stringify(data));
-      } catch {}
+      saveStored(data);
 
-      setUserId(user.id);
-      setPassword("");
+      setMeId(user.id);
+      setPass("");
       setError(false);
+
       return;
     }
 
@@ -3531,100 +5347,216 @@ export default function Admin({
 
   const logout = () => {
     try {
-      sessionStorage.removeItem(SESSION_KEY);
+      sessionStorage.removeItem(
+        OK
+      );
     } catch {}
 
-    setUserId("");
+    setMeId("");
     setEmail("");
-    setPassword("");
+    setPass("");
   };
 
   return (
     <>
-      <style>{adminCSS}</style>
+      <style>{ADMIN_CSS}</style>
 
-      {userId ? (
-        <AdminPanel
+      {meId ? (
+        <Panel
           products={products}
           cats={cats}
           slides={slides}
-          userId={userId}
+          meId={meId}
           onBack={onBack}
-          onLogout={logout}
+          logout={logout}
         />
       ) : (
-        <div className="ea-login-page">
-          <div className="ea-login-brand">
-            <div className="ea-logo large">ES</div>
-            <b>EVER STYLE</b>
-            <span>ADMIN CONSOLE</span>
-          </div>
+        <div className="ad-login">
+          <div className="ad-login-decoration ad-dec-1" />
+          <div className="ad-login-decoration ad-dec-2" />
 
-          <form className="ea-login-card" onSubmit={login}>
-            <span className="ea-eyebrow">
-              Welcome back
-            </span>
+          <button
+            className="ad-login-back"
+            onClick={onBack}
+          >
+            ← Back to store
+          </button>
 
-            <h1>Sign in to admin</h1>
+          <section className="ad-login-panel">
+            <div className="ad-login-brand">
+              <div className="ad-login-logo">
+                ES
+              </div>
 
-            <p>
-              Manage products, orders, customers and your
-              storefront.
-            </p>
+              <div>
+                <strong>
+                  EVER STYLE
+                </strong>
 
-            <Field label="Email address">
-              <input
-                className="ea-input login-input"
-                type="email"
-                placeholder="owner@everstyle.store"
-                autoComplete="username"
-                value={email}
-                onChange={(e) => {
-                  setEmail(e.target.value);
-                  setError(false);
-                }}
-              />
-            </Field>
+                <span>
+                  ADMIN CONSOLE
+                </span>
+              </div>
+            </div>
 
-            <Field label="Passcode">
-              <input
-                className={`ea-input login-input ${
-                  error ? "error" : ""
-                }`}
-                type="password"
-                placeholder="Enter your passcode"
-                autoComplete="current-password"
-                value={password}
-                onChange={(e) => {
-                  setPassword(e.target.value);
-                  setError(false);
-                }}
-              />
+            <div className="ad-login-copy">
+              <span>
+                STORE MANAGEMENT
+              </span>
+
+              <h1>
+                Welcome
+                <br />
+                back.
+              </h1>
+
+              <p>
+                Manage your products,
+                orders, customers and
+                storefront from one
+                beautifully organized
+                workspace.
+              </p>
+            </div>
+
+            <div className="ad-login-feature">
+              <div>01</div>
+              <span>
+                <b>
+                  Complete control
+                </b>
+                Products, inventory,
+                orders and marketing.
+              </span>
+            </div>
+
+            <div className="ad-login-feature">
+              <div>02</div>
+              <span>
+                <b>
+                  Secure access
+                </b>
+                Role-based access for
+                your admin team.
+              </span>
+            </div>
+          </section>
+
+          <section className="ad-login-form-side">
+            <form
+              className="ad-login-form"
+              onSubmit={login}
+            >
+              <div className="ad-login-form-head">
+                <span>
+                  ADMIN ACCESS
+                </span>
+
+                <h2>
+                  Sign in to your
+                  account
+                </h2>
+
+                <p>
+                  Enter your admin
+                  credentials to
+                  continue.
+                </p>
+              </div>
+
+              <Field label="Email address">
+                <input
+                  className="ad-input ad-login-input"
+                  type="email"
+                  placeholder="owner@everstyle.store"
+                  autoComplete="username"
+                  value={email}
+                  onChange={(e) => {
+                    setEmail(
+                      e.target.value
+                    );
+                    setError(false);
+                  }}
+                />
+              </Field>
+
+              <Field label="Passcode">
+                <div className="ad-password">
+                  <input
+                    className={`ad-input ad-login-input ${
+                      error
+                        ? "error"
+                        : ""
+                    }`}
+                    type={
+                      showPass
+                        ? "text"
+                        : "password"
+                    }
+                    placeholder="Enter passcode"
+                    autoComplete="current-password"
+                    value={pass}
+                    onChange={(e) => {
+                      setPass(
+                        e.target
+                          .value
+                      );
+                      setError(
+                        false
+                      );
+                    }}
+                  />
+
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setShowPass(
+                        !showPass
+                      )
+                    }
+                  >
+                    {showPass
+                      ? "Hide"
+                      : "Show"}
+                  </button>
+                </div>
+              </Field>
 
               {error && (
-                <small className="ea-error">
-                  Incorrect email or passcode.
-                </small>
+                <div className="ad-login-error">
+                  Incorrect email or
+                  passcode. Please try
+                  again.
+                </div>
               )}
-            </Field>
 
-            <button className="ea-login-button">
-              Sign in
-              <span>→</span>
-            </button>
+              <button className="ad-signin">
+                <span>
+                  Sign in to admin
+                </span>
+                <b>→</b>
+              </button>
 
-            <button
-              type="button"
-              className="ea-back"
-              onClick={onBack}
-            >
-              ← Back to store
-            </button>
-          </form>
+              <div className="ad-login-hint">
+                <span>
+                  Owner access
+                </span>
 
-          <span className="ea-login-footer">
-            © {new Date().getFullYear()} Ever Style
-          </span>
+                <p>
+                  You can leave the
+                  email field empty and
+                  use the Owner
+                  passcode.
+                </p>
+              </div>
+            </form>
+          </section>
+
+          <div className="ad-login-footer">
+            © 2026 Ever Style ·
+            Premium lifestyle
+            marketplace
+          </div>
         </div>
       )}
     </>
@@ -3632,392 +5564,419 @@ export default function Admin({
 }
 
 /* ============================================================
-   CSS
+   CSS — STORE MATCHED THEME
 ============================================================ */
 
-const adminCSS = `
-*{box-sizing:border-box}
+const ADMIN_CSS = `
+@import url('https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@400;500;600;700;800&family=DM+Sans:wght@400;500;600;700&family=Hind+Siliguri:wght@400;500;600;700&display=swap');
 
-.ea-admin{
-  --ea-bg:#f6f7f9;
-  --ea-card:#fff;
-  --ea-text:#111318;
-  --ea-muted:#747982;
-  --ea-border:#e7e9ed;
-  --ea-soft:#f2f3f5;
-  --ea-dark:#111318;
-  --ea-accent:#6c4cff;
-  --ea-danger:#d84c4c;
-  min-height:100vh;
-  display:flex;
-  background:var(--ea-bg);
-  color:var(--ea-text);
-  font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+*{
+  box-sizing:border-box;
 }
 
-.ea-sidebar{
+.ad-shell,
+.ad-login{
+  --green:#17392B;
+  --green-2:#1F4A38;
+  --green-3:#285A45;
+  --green-soft:#E8EFEA;
+  --cream:#F7F3E8;
+  --cream-2:#F5EBD2;
+  --champagne:#E8D4A5;
+  --gold:#C6A968;
+  --white:#FFFFFF;
+  --ink:#17201B;
+  --muted:#758078;
+  --border:#E3E8E3;
+  --danger:#B94B47;
+  --orange:#B87726;
+
+  font-family:"DM Sans","Hind Siliguri",sans-serif;
+  color:var(--ink);
+}
+
+.ad-shell button,
+.ad-shell input,
+.ad-shell select,
+.ad-shell textarea,
+.ad-login button,
+.ad-login input,
+.ad-login select{
+  font:inherit;
+}
+
+.ad-shell h1,
+.ad-shell h2,
+.ad-shell h3,
+.ad-login h1,
+.ad-login h2,
+.ad-login h3{
+  font-family:"Bricolage Grotesque","Hind Siliguri",sans-serif;
+}
+
+/* ---------- MAIN LAYOUT ---------- */
+
+.ad-shell{
+  min-height:100vh;
+  display:flex;
+  background:#F7F8F5;
+}
+
+.ad-sidebar{
+  width:270px;
   position:fixed;
-  z-index:50;
+  z-index:60;
   left:0;
   top:0;
   bottom:0;
-  width:260px;
-  background:#111318;
-  color:#fff;
+  background:var(--green);
+  color:white;
   display:flex;
   flex-direction:column;
-  padding:22px 14px 14px;
   overflow:auto;
+  padding:22px 15px 15px;
 }
 
-.ea-brand{
+.ad-brand{
+  min-height:65px;
   display:flex;
   align-items:center;
   gap:12px;
-  padding:0 8px 24px;
-  border-bottom:1px solid rgba(255,255,255,.08);
+  padding:0 8px 20px;
+  border-bottom:1px solid rgba(255,255,255,.11);
 }
 
-.ea-logo{
-  width:40px;
-  height:40px;
-  border-radius:12px;
-  background:#fff;
-  color:#111318;
-  display:grid;
-  place-items:center;
-  font-size:13px;
-  font-weight:900;
-  letter-spacing:-.5px;
-}
-
-.ea-logo.large{
-  width:54px;
-  height:54px;
-  border-radius:16px;
-  background:#111318;
-  color:#fff;
-}
-
-.ea-brand b{
-  display:block;
-  font-size:14px;
-  letter-spacing:.09em;
-}
-
-.ea-brand span{
-  display:block;
-  margin-top:2px;
-  font-size:11px;
-  color:#8d929b;
-}
-
-.ea-nav{
-  flex:1;
-  padding:16px 0;
-}
-
-.ea-nav-group{
-  margin-bottom:20px;
-}
-
-.ea-nav-label{
-  display:block;
-  padding:0 12px 7px;
-  color:#656b74;
-  font-size:10px;
-  font-weight:800;
-  text-transform:uppercase;
-  letter-spacing:.13em;
-}
-
-.ea-nav button{
-  width:100%;
-  border:0;
-  background:transparent;
-  color:#aeb3bb;
-  padding:9px 11px;
-  border-radius:10px;
-  display:flex;
-  align-items:center;
-  gap:11px;
-  font:inherit;
-  font-size:13px;
-  cursor:pointer;
-  transition:.18s;
-}
-
-.ea-nav button:hover{
-  background:rgba(255,255,255,.05);
-  color:#fff;
-}
-
-.ea-nav button.active{
-  background:#fff;
-  color:#111318;
-  font-weight:700;
-}
-
-.ea-nav button em{
-  margin-left:auto;
-  min-width:20px;
-  height:20px;
-  border-radius:20px;
-  display:grid;
-  place-items:center;
-  background:#f05b5b;
-  color:#fff;
-  font-style:normal;
-  font-size:10px;
-}
-
-.ea-icon{
-  width:20px;
-  text-align:center;
-  font-size:15px;
-}
-
-.ea-sidebar-bottom{
-  border-top:1px solid rgba(255,255,255,.08);
-  padding-top:12px;
-}
-
-.ea-store-btn{
-  border:0;
-  width:100%;
-  background:rgba(255,255,255,.05);
-  color:#fff;
-  padding:10px;
-  border-radius:11px;
-  display:flex;
-  align-items:center;
-  gap:10px;
-  text-align:left;
-  cursor:pointer;
-}
-
-.ea-store-btn span{
-  display:grid;
-}
-
-.ea-store-btn b{
-  font-size:12px;
-}
-
-.ea-store-btn small{
-  color:#858b94;
-  font-size:10px;
-  margin-top:2px;
-}
-
-.ea-user{
-  display:flex;
-  align-items:center;
-  gap:9px;
-  margin-top:10px;
-  padding:8px;
-}
-
-.ea-avatar{
-  flex:none;
-  width:36px;
-  height:36px;
+.ad-brand-mark{
+  width:43px;
+  height:43px;
   border-radius:50%;
   display:grid;
   place-items:center;
-  background:#ececf1;
-  color:#111318;
-  font-size:12px;
+  flex:none;
+  background:var(--cream-2);
+  color:var(--green);
+  font-family:"Bricolage Grotesque",sans-serif;
+  font-size:13px;
   font-weight:800;
+  letter-spacing:-.04em;
 }
 
-.ea-user>div:nth-child(2){
+.ad-brand>div:last-child{
+  display:grid;
+  gap:2px;
+}
+
+.ad-brand strong{
+  font-family:"Bricolage Grotesque",sans-serif;
+  font-size:15px;
+  letter-spacing:.12em;
+}
+
+.ad-brand span{
+  font-size:8px;
+  color:#AFC0B7;
+  letter-spacing:.17em;
+}
+
+.ad-nav{
+  flex:1;
+  padding:21px 0;
+}
+
+.ad-nav-group{
+  margin-bottom:23px;
+}
+
+.ad-nav-title{
+  display:block;
+  padding:0 12px 8px;
+  color:#779285;
+  font-size:9px;
+  font-weight:700;
+  letter-spacing:.15em;
+  text-transform:uppercase;
+}
+
+.ad-nav button{
+  width:100%;
+  min-height:43px;
+  border:0;
+  padding:0 12px;
+  border-radius:12px;
+  display:flex;
+  align-items:center;
+  gap:11px;
+  background:transparent;
+  color:#B9C8C0;
+  cursor:pointer;
+  text-align:left;
+  font-size:12px;
+  transition:.2s ease;
+}
+
+.ad-nav button:hover{
+  background:rgba(255,255,255,.06);
+  color:#fff;
+}
+
+.ad-nav button.active{
+  background:var(--cream-2);
+  color:var(--green);
+  font-weight:700;
+  box-shadow:0 7px 22px rgba(0,0,0,.1);
+}
+
+.ad-nav-icon{
+  width:21px;
+  text-align:center;
+  font-size:16px;
+}
+
+.ad-nav button em{
+  margin-left:auto;
+  min-width:21px;
+  height:21px;
+  padding:0 5px;
+  border-radius:20px;
+  display:grid;
+  place-items:center;
+  background:#D96D60;
+  color:#fff;
+  font-size:9px;
+  font-style:normal;
+}
+
+.ad-sidebar-footer{
+  padding-top:13px;
+  border-top:1px solid rgba(255,255,255,.1);
+}
+
+.ad-view-store{
+  width:100%;
+  border:1px solid rgba(255,255,255,.1);
+  background:rgba(255,255,255,.05);
+  color:#fff;
+  border-radius:13px;
+  padding:11px;
+  display:flex;
+  align-items:center;
+  gap:10px;
+  cursor:pointer;
+  text-align:left;
+}
+
+.ad-view-icon{
+  width:35px;
+  height:35px;
+  border-radius:10px;
+  background:var(--cream-2);
+  color:var(--green);
+  display:grid;
+  place-items:center;
+  font-size:15px;
+}
+
+.ad-view-store div{
+  display:grid;
+  gap:2px;
+}
+
+.ad-view-store b{
+  font-size:11px;
+}
+
+.ad-view-store small{
+  font-size:9px;
+  color:#91A79B;
+}
+
+.ad-admin-user{
+  display:flex;
+  align-items:center;
+  gap:9px;
+  padding:13px 7px 2px;
+}
+
+.ad-admin-avatar{
+  width:37px;
+  height:37px;
+  flex:none;
+  border-radius:50%;
+  display:grid;
+  place-items:center;
+  background:#285342;
+  color:var(--cream-2);
+  border:1px solid rgba(255,255,255,.12);
+  font-weight:700;
+  font-size:11px;
+}
+
+.ad-admin-user>div:nth-child(2){
   min-width:0;
   flex:1;
   display:grid;
 }
 
-.ea-user b{
-  font-size:12px;
+.ad-admin-user b{
+  font-size:11px;
 }
 
-.ea-user span{
-  color:#7f858e;
+.ad-admin-user span{
+  color:#8EA598;
+  font-size:9px;
+}
+
+.ad-admin-user>button{
+  border:0;
+  background:transparent;
+  color:#9BAFA4;
+  font-size:17px;
+  cursor:pointer;
+}
+
+.ad-main{
+  min-height:100vh;
+  width:calc(100% - 270px);
+  margin-left:270px;
+}
+
+.ad-header{
+  min-height:92px;
+  padding:17px 30px;
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  gap:20px;
+  background:rgba(255,255,255,.96);
+  border-bottom:1px solid var(--border);
+  position:sticky;
+  top:0;
+  z-index:30;
+  backdrop-filter:blur(15px);
+}
+
+.ad-header-left{
+  display:flex;
+  align-items:center;
+  gap:13px;
+}
+
+.ad-header-kicker{
+  display:block;
+  margin-bottom:2px;
+  color:#9AA39C;
+  font-size:8px;
+  font-weight:700;
+  letter-spacing:.14em;
+}
+
+.ad-header h1{
+  margin:0;
+  color:var(--green);
+  font-size:23px;
+  line-height:1.1;
+  letter-spacing:-.035em;
+}
+
+.ad-header p{
+  margin:5px 0 0;
+  color:#89928C;
   font-size:10px;
 }
 
-.ea-user>button{
-  border:0;
-  background:transparent;
-  color:#8e949d;
-  cursor:pointer;
-  font-size:17px;
+.ad-header-right{
+  display:flex;
+  align-items:center;
+  gap:13px;
 }
 
-.ea-main{
-  width:calc(100% - 260px);
-  margin-left:260px;
-  min-height:100vh;
-}
-
-.ea-header{
-  min-height:88px;
-  padding:17px 28px;
+.ad-store-button{
+  min-height:39px;
+  padding:0 14px;
+  border:1px solid #DCE3DD;
+  border-radius:10px;
+  display:flex;
+  align-items:center;
+  gap:10px;
   background:#fff;
-  border-bottom:1px solid var(--ea-border);
-  display:flex;
-  align-items:center;
-  justify-content:space-between;
-  gap:20px;
-  position:sticky;
-  top:0;
-  z-index:20;
+  color:var(--green);
+  cursor:pointer;
+  font-size:10px;
+  font-weight:700;
 }
 
-.ea-header-left{
-  display:flex;
-  align-items:center;
-  gap:12px;
-}
-
-.ea-header h1{
-  margin:0;
-  font-size:22px;
-  letter-spacing:-.03em;
-}
-
-.ea-header p{
-  margin:4px 0 0;
-  color:var(--ea-muted);
-  font-size:12px;
-}
-
-.ea-header-actions{
-  display:flex;
-  align-items:center;
-  gap:12px;
-}
-
-.ea-header-user{
+.ad-header-profile{
+  padding-left:13px;
+  border-left:1px solid var(--border);
   display:flex;
   align-items:center;
   gap:8px;
-  padding-left:12px;
-  border-left:1px solid var(--ea-border);
 }
 
-.ea-header-user>div:last-child{
+.ad-header-profile>div{
+  width:35px;
+  height:35px;
+  border-radius:50%;
+  display:grid;
+  place-items:center;
+  background:var(--green);
+  color:var(--cream-2);
+  font-size:10px;
+  font-weight:700;
+}
+
+.ad-header-profile>span{
   display:grid;
 }
 
-.ea-header-user b{
-  font-size:12px;
-}
-
-.ea-header-user span{
+.ad-header-profile b{
   font-size:10px;
-  color:var(--ea-muted);
 }
 
-.ea-menu-btn{
+.ad-header-profile small{
+  color:#939C96;
+  font-size:8px;
+}
+
+.ad-menu-button{
   display:none;
-  border:1px solid var(--ea-border);
-  background:#fff;
   width:40px;
   height:40px;
+  border:1px solid var(--border);
   border-radius:10px;
+  background:#fff;
+  color:var(--green);
+  cursor:pointer;
 }
 
-.ea-content{
-  max-width:1500px;
+.ad-content{
+  width:min(1500px,100%);
   margin:auto;
   padding:28px;
 }
 
-.ea-page{
+.ad-stack{
   display:grid;
-  gap:20px;
+  gap:18px;
 }
 
-.ea-stats{
-  display:grid;
-  grid-template-columns:repeat(4,1fr);
-  gap:14px;
-}
+/* ---------- CARDS ---------- */
 
-.ea-stat{
-  border:1px solid var(--ea-border);
-  background:#fff;
-  border-radius:16px;
-  padding:18px;
-  text-align:left;
-  cursor:pointer;
-  transition:.2s;
-}
-
-.ea-stat:hover{
-  transform:translateY(-2px);
-  box-shadow:0 12px 35px rgba(20,20,30,.06);
-}
-
-.ea-stat-top{
-  display:flex;
-  align-items:center;
-  justify-content:space-between;
-  margin-bottom:20px;
-}
-
-.ea-stat-icon{
-  width:38px;
-  height:38px;
-  border-radius:11px;
-  background:#f1f1f4;
-  display:grid;
-  place-items:center;
-  font-weight:800;
-}
-
-.ea-stat-arrow{
-  color:#a5a8ae;
-}
-
-.ea-stat strong{
-  display:block;
-  font-size:25px;
-  letter-spacing:-.04em;
-}
-
-.ea-stat h3{
-  margin:5px 0 2px;
-  font-size:12px;
-}
-
-.ea-stat p{
-  margin:0;
-  color:var(--ea-muted);
-  font-size:10px;
-}
-
-.ea-dashboard-grid{
-  display:grid;
-  grid-template-columns:minmax(0,1.5fr) minmax(320px,.8fr);
-  gap:20px;
-}
-
-.ea-card{
-  background:#fff;
-  border:1px solid var(--ea-border);
-  border-radius:16px;
+.ad-card{
+  margin:0 0 18px;
   padding:20px;
-  margin-bottom:18px;
+  background:#fff;
+  border:1px solid var(--border);
+  border-radius:18px;
+  box-shadow:0 3px 15px rgba(23,57,43,.025);
 }
 
-.ea-card.no-pad{
+.ad-no-padding{
   padding:0;
   overflow:hidden;
 }
 
-.ea-card-head{
+.ad-card-head{
   display:flex;
   align-items:flex-start;
   justify-content:space-between;
@@ -4025,52 +5984,117 @@ const adminCSS = `
   margin-bottom:18px;
 }
 
-.ea-card-head h2{
+.ad-card-head h2{
   margin:3px 0 0;
+  color:var(--green);
   font-size:16px;
   letter-spacing:-.02em;
 }
 
-.ea-card-head p{
+.ad-card-head p{
   margin:4px 0 0;
-  color:var(--ea-muted);
-  font-size:11px;
-}
-
-.ea-eyebrow{
-  color:#969ba3;
-  text-transform:uppercase;
-  letter-spacing:.12em;
-  font-size:9px;
-  font-weight:800;
-}
-
-.ea-soft-badge{
-  background:#f2f3f5;
-  border-radius:99px;
-  padding:6px 9px;
-  color:#6e737c;
+  color:var(--muted);
   font-size:10px;
 }
 
-.ea-text-btn{
-  border:0;
-  background:transparent;
-  color:#626872;
-  font-size:11px;
+.ad-kicker{
+  color:#9B8B64;
+  font-size:8px;
   font-weight:700;
-  cursor:pointer;
+  letter-spacing:.14em;
 }
 
-.ea-chart{
+.ad-pill{
+  padding:6px 10px;
+  border-radius:30px;
+  background:var(--cream);
+  color:#88774F;
+  font-size:9px;
+}
+
+/* ---------- DASHBOARD ---------- */
+
+.ad-stats{
+  display:grid;
+  grid-template-columns:repeat(4,1fr);
+  gap:13px;
+}
+
+.ad-stat{
+  min-height:165px;
+  padding:18px;
+  border:1px solid var(--border);
+  border-radius:17px;
+  background:#fff;
+  text-align:left;
+  cursor:pointer;
+  transition:.2s;
+}
+
+.ad-stat:hover{
+  transform:translateY(-3px);
+  border-color:#CAD7CE;
+  box-shadow:0 13px 35px rgba(23,57,43,.07);
+}
+
+.ad-stat-top{
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  margin-bottom:19px;
+}
+
+.ad-stat-icon{
+  width:40px;
+  height:40px;
+  border-radius:12px;
+  display:grid;
+  place-items:center;
+  background:var(--green-soft);
+  color:var(--green);
+  font-size:15px;
+  font-weight:700;
+}
+
+.ad-stat-arrow{
+  color:#A8B1AB;
+}
+
+.ad-stat strong{
+  display:block;
+  color:var(--green);
+  font-family:"Bricolage Grotesque",sans-serif;
+  font-size:25px;
+  letter-spacing:-.04em;
+}
+
+.ad-stat h3{
+  margin:6px 0 3px;
+  color:#344239;
+  font-size:11px;
+}
+
+.ad-stat p{
+  margin:0;
+  color:#9AA29D;
+  font-size:9px;
+}
+
+.ad-dashboard-grid{
+  display:grid;
+  grid-template-columns:minmax(0,1.5fr) minmax(300px,.75fr);
+  gap:18px;
+}
+
+.ad-chart{
   height:240px;
   display:flex;
-  gap:13px;
   align-items:flex-end;
-  padding-top:20px;
+  gap:14px;
+  padding-top:15px;
 }
 
-.ea-chart-col{
+.ad-chart-item{
   flex:1;
   height:100%;
   display:flex;
@@ -4079,1036 +6103,1316 @@ const adminCSS = `
   gap:8px;
 }
 
-.ea-bar-space{
-  flex:1;
+.ad-chart-space{
   width:100%;
+  flex:1;
   display:flex;
   align-items:flex-end;
   justify-content:center;
-  border-bottom:1px solid #eee;
+  border-bottom:1px solid #EBEFEB;
 }
 
-.ea-chart-bar{
-  width:min(40px,70%);
-  background:#111318;
-  border-radius:6px 6px 2px 2px;
-  min-height:5px;
+.ad-chart-bar{
+  width:min(42px,72%);
+  min-height:4px;
+  border-radius:7px 7px 2px 2px;
+  background:linear-gradient(180deg,#285A45,#17392B);
 }
 
-.ea-chart-col>span{
-  font-size:10px;
-  color:#92969e;
+.ad-chart-item>span{
+  color:#969F99;
+  font-size:9px;
 }
 
-.ea-mini-list{
+.ad-overview-list{
   display:grid;
 }
 
-.ea-mini-order{
+.ad-overview-list button{
+  min-height:55px;
+  border:0;
+  border-bottom:1px solid #EEF1EE;
+  background:transparent;
   display:flex;
   align-items:center;
-  gap:10px;
-  padding:11px 0;
-  border-bottom:1px solid #f0f1f3;
+  justify-content:space-between;
+  cursor:pointer;
+  color:var(--green);
 }
 
-.ea-mini-order:last-child{
+.ad-overview-list button:last-child{
   border:0;
 }
 
-.ea-mini-main{
-  flex:1;
-  min-width:0;
+.ad-overview-list button>span{
+  display:flex;
+  align-items:center;
+  gap:10px;
+  font-size:10px;
+  font-weight:600;
+}
+
+.ad-overview-list i{
+  width:31px;
+  height:31px;
+  border-radius:9px;
   display:grid;
+  place-items:center;
+  background:var(--cream);
+  color:#8E7B4D;
+  font-style:normal;
 }
 
-.ea-mini-main b{
-  font-size:11px;
+.ad-overview-list b{
+  font-size:13px;
 }
 
-.ea-mini-main span{
-  color:#92969d;
-  font-size:9px;
-  margin-top:2px;
+/* ---------- TABLE ---------- */
+
+.ad-table-wrap{
+  width:100%;
+  overflow:auto;
 }
 
-.ea-mini-right{
-  display:grid;
-  justify-items:end;
-  gap:4px;
+.ad-table{
+  width:100%;
+  min-width:720px;
+  border-collapse:collapse;
 }
 
-.ea-mini-right>b{
-  font-size:11px;
+.ad-table th{
+  padding:12px 16px;
+  background:#FAFBF8;
+  border-bottom:1px solid var(--border);
+  color:#929C95;
+  text-align:left;
+  font-size:8px;
+  font-weight:700;
+  letter-spacing:.1em;
+  text-transform:uppercase;
 }
 
-.ea-status{
+.ad-table td{
+  padding:14px 16px;
+  border-bottom:1px solid #EEF1EE;
+  color:#647068;
+  font-size:10px;
+}
+
+.ad-table tbody tr:last-child td{
+  border-bottom:0;
+}
+
+.ad-table tbody tr:hover{
+  background:#FCFDFB;
+}
+
+.ad-table td b{
+  color:#28372E;
+  font-size:10px;
+}
+
+.ad-table td small{
+  display:block;
+  margin-top:3px;
+  color:#9BA39E;
+  font-size:8px;
+}
+
+/* ---------- STATUS ---------- */
+
+.ad-status{
+  width:max-content;
+  padding:5px 8px;
+  border-radius:30px;
   display:inline-flex;
   align-items:center;
   gap:5px;
-  width:max-content;
-  padding:4px 7px;
-  border-radius:99px;
-  background:#f2f3f4;
-  color:#62676f;
-  font-size:9px;
+  background:#F0F2F0;
+  color:#69736C;
+  font-size:8px;
   font-weight:700;
   white-space:nowrap;
 }
 
-.ea-status i{
+.ad-status i{
   width:5px;
   height:5px;
   border-radius:50%;
   background:currentColor;
 }
 
-.status-delivered,
-.status-approved,
-.status-active,
-.status-in-stock{
-  color:#25835a;
-  background:#edf8f2;
+.ad-active,
+.ad-approved,
+.ad-delivered,
+.ad-in-stock{
+  color:#397459;
+  background:#EAF4ED;
 }
 
-.status-pending,
-.status-low-stock{
-  color:#a86a12;
-  background:#fff6e7;
+.ad-pending,
+.ad-low-stock{
+  color:#9A6A24;
+  background:#FFF5E3;
 }
 
-.status-processing{
-  color:#356bb5;
-  background:#edf4ff;
+.ad-processing{
+  color:#47709A;
+  background:#EDF4FA;
 }
 
-.status-shipped{
-  color:#6d51b4;
-  background:#f2edff;
+.ad-shipped{
+  color:#765F9A;
+  background:#F2EEFA;
 }
 
-.status-cancelled,
-.status-rejected,
-.status-out-of-stock{
-  color:#b54444;
-  background:#fff0f0;
+.ad-cancelled,
+.ad-rejected,
+.ad-out-of-stock{
+  color:#A94A47;
+  background:#FBEDEC;
 }
 
-.ea-table-wrap{
-  width:100%;
-  overflow:auto;
+.ad-paused{
+  color:#7E7663;
+  background:#F3F0E8;
 }
 
-.ea-table{
-  width:100%;
-  border-collapse:collapse;
-  min-width:720px;
-}
+/* ---------- TOOLBAR ---------- */
 
-.ea-table th{
-  background:#fafafb;
-  color:#8c9199;
-  text-transform:uppercase;
-  letter-spacing:.08em;
-  font-size:9px;
-  font-weight:800;
-  text-align:left;
-  padding:12px 16px;
-  border-bottom:1px solid var(--ea-border);
-}
-
-.ea-table td{
-  padding:14px 16px;
-  border-bottom:1px solid #f0f1f3;
-  font-size:11px;
-  color:#646a72;
-}
-
-.ea-table tbody tr:last-child td{
-  border-bottom:0;
-}
-
-.ea-table tbody tr:hover{
-  background:#fcfcfd;
-}
-
-.ea-table td b{
-  color:#22252a;
-  font-size:11px;
-}
-
-.ea-table td small{
-  display:block;
-  margin-top:3px;
-  color:#9a9ea5;
-  font-size:9px;
-}
-
-.right{
-  text-align:right!important;
-}
-
-.ea-toolbar{
+.ad-toolbar{
+  margin-bottom:15px;
   display:flex;
   align-items:center;
-  gap:10px;
-  margin-bottom:16px;
-}
-
-.ea-search{
-  min-width:220px;
-  max-width:460px;
-  flex:1;
-  position:relative;
-}
-
-.ea-search>span{
-  position:absolute;
-  left:13px;
-  top:50%;
-  transform:translateY(-50%);
-  color:#9ca0a7;
-}
-
-.ea-search input{
-  width:100%;
-  height:42px;
-  padding:0 14px 0 38px;
-  border:1px solid var(--ea-border);
-  border-radius:11px;
-  background:#fff;
-  outline:0;
-  font:inherit;
-  font-size:12px;
-}
-
-.ea-select,
-.ea-input{
-  width:100%;
-  min-height:42px;
-  padding:9px 11px;
-  border:1px solid var(--ea-border);
-  border-radius:10px;
-  background:#fff;
-  color:#22252a;
-  outline:0;
-  font:inherit;
-  font-size:12px;
-}
-
-.ea-select{
-  width:auto;
-  min-width:130px;
-}
-
-.ea-input:focus,
-.ea-search input:focus{
-  border-color:#9c9fa6;
-  box-shadow:0 0 0 3px rgba(30,30,40,.04);
-}
-
-textarea.ea-input{
-  resize:vertical;
-}
-
-.ea-field{
-  display:grid;
-  gap:6px;
-}
-
-.ea-field>span{
-  color:#5e646c;
-  font-size:10px;
-  font-weight:700;
-}
-
-.ea-btn{
-  min-height:40px;
-  border:1px solid transparent;
-  border-radius:10px;
-  padding:0 14px;
-  font:inherit;
-  font-size:11px;
-  font-weight:700;
-  cursor:pointer;
-  white-space:nowrap;
-}
-
-.ea-btn.primary{
-  background:#111318;
-  color:#fff;
-}
-
-.ea-btn.secondary{
-  background:#fff;
-  color:#30343a;
-  border-color:var(--ea-border);
-}
-
-.ea-btn.danger{
-  background:#fff;
-  color:#bd4646;
-  border-color:#f0dada;
-}
-
-.ea-icon-btn{
-  width:34px;
-  height:34px;
-  border:1px solid var(--ea-border);
-  border-radius:9px;
-  background:#fff;
-  color:#565b63;
-  cursor:pointer;
-}
-
-.ea-icon-btn.danger{
-  color:#c14b4b;
-}
-
-.ea-icon-btn:disabled{
-  opacity:.35;
-  cursor:not-allowed;
-}
-
-.ea-empty{
-  padding:45px 20px;
-  display:grid;
-  justify-items:center;
-  text-align:center;
-}
-
-.ea-empty-icon{
-  width:48px;
-  height:48px;
-  border-radius:50%;
-  background:#f3f4f5;
-  display:grid;
-  place-items:center;
-  color:#858a92;
-  font-size:20px;
-}
-
-.ea-empty h3{
-  margin:10px 0 4px;
-  font-size:14px;
-}
-
-.ea-empty p{
-  margin:0;
-  color:#92969d;
-  font-size:11px;
-}
-
-.ea-modal-bg{
-  position:fixed;
-  z-index:100;
-  inset:0;
-  background:rgba(8,10,14,.56);
-  backdrop-filter:blur(5px);
-  display:grid;
-  place-items:center;
-  padding:20px;
-}
-
-.ea-modal{
-  width:min(560px,100%);
-  max-height:90vh;
-  overflow:auto;
-  background:#fff;
-  border-radius:18px;
-  box-shadow:0 30px 100px rgba(0,0,0,.25);
-}
-
-.ea-modal.wide{
-  width:min(950px,100%);
-}
-
-.ea-modal-head{
-  position:sticky;
-  top:0;
-  z-index:5;
-  background:#fff;
-  display:flex;
-  justify-content:space-between;
-  align-items:center;
-  gap:15px;
-  padding:18px 22px;
-  border-bottom:1px solid var(--ea-border);
-}
-
-.ea-modal-head h2{
-  margin:3px 0 0;
-  font-size:18px;
-}
-
-.ea-close{
-  width:36px;
-  height:36px;
-  border:1px solid var(--ea-border);
-  background:#fff;
-  border-radius:10px;
-  font-size:20px;
-  cursor:pointer;
-}
-
-.ea-modal-body{
-  padding:22px;
-}
-
-.ea-modal-actions{
-  display:flex;
-  justify-content:flex-end;
-  gap:8px;
-  padding-top:20px;
-  margin-top:20px;
-  border-top:1px solid var(--ea-border);
-}
-
-.ea-order-summary{
-  display:grid;
-  grid-template-columns:repeat(4,1fr);
-  gap:10px;
-  margin-bottom:18px;
-}
-
-.ea-order-summary>div{
-  padding:13px;
-  background:#f7f8f9;
-  border-radius:11px;
-  display:grid;
-  gap:4px;
-}
-
-.ea-order-summary span{
-  color:#8c9198;
-  font-size:9px;
-}
-
-.ea-order-summary b{
-  font-size:11px;
-}
-
-.ea-detail-grid{
-  display:grid;
-  grid-template-columns:1fr 1fr;
-  gap:14px;
-}
-
-.ea-subcard{
-  border:1px solid var(--ea-border);
-  border-radius:13px;
-  padding:15px;
-  margin-bottom:12px;
-}
-
-.ea-subcard h3{
-  margin:0 0 12px;
-  font-size:12px;
-}
-
-.ea-subcard p{
-  color:#6d7279;
-  font-size:11px;
-}
-
-.ea-line{
-  display:flex;
-  justify-content:space-between;
-  gap:15px;
-  align-items:center;
-  padding:9px 0;
-  border-bottom:1px solid #f0f1f3;
-  font-size:11px;
-}
-
-.ea-line:last-child{
-  border:0;
-}
-
-.ea-line>div{
-  display:grid;
-}
-
-.ea-line span{
-  color:#8e9299;
-  font-size:9px;
-  margin-top:2px;
-}
-
-.ea-info{
-  display:grid;
-  gap:3px;
-  padding:7px 0;
-}
-
-.ea-info span{
-  color:#8f949b;
-  font-size:9px;
-}
-
-.ea-info b{
-  font-size:11px;
-}
-
-.ea-product-grid{
-  display:grid;
-  grid-template-columns:repeat(3,minmax(0,1fr));
-  gap:15px;
-}
-
-.ea-product-card{
-  overflow:hidden;
-  border:1px solid var(--ea-border);
-  border-radius:15px;
-  background:#fff;
-}
-
-.ea-product-thumb{
-  position:relative;
-  aspect-ratio:4/3;
-  background:#f3f4f5;
-  overflow:hidden;
-}
-
-.ea-product-thumb img{
-  width:100%;
-  height:100%;
-  object-fit:cover;
-  display:block;
-}
-
-.ea-no-photo{
-  width:100%;
-  height:100%;
-  display:grid;
-  place-items:center;
-  color:#a4a8af;
-  font-size:32px;
-}
-
-.ea-product-state{
-  position:absolute;
-  top:10px;
-  left:10px;
-  background:#fff;
-  color:#277957;
-  border-radius:99px;
-  padding:5px 8px;
-  font-size:9px;
-  font-weight:800;
-  box-shadow:0 3px 12px rgba(0,0,0,.08);
-}
-
-.ea-product-state.hidden{
-  color:#b34747;
-}
-
-.ea-product-body{
-  padding:15px;
-}
-
-.ea-product-title{
-  display:flex;
-  align-items:flex-start;
-  justify-content:space-between;
-  gap:10px;
-}
-
-.ea-product-title h3{
-  margin:0;
-  font-size:13px;
-}
-
-.ea-product-title>div>span{
-  display:block;
-  color:#989ca3;
-  font-size:9px;
-  margin-top:3px;
-}
-
-.ea-tag{
-  background:#f0f1f3;
-  padding:4px 7px;
-  border-radius:99px;
-  font-size:8px;
-  white-space:nowrap;
-}
-
-.ea-product-meta{
-  display:grid;
-  grid-template-columns:repeat(3,1fr);
-  margin:15px 0;
-  padding:12px 0;
-  border-top:1px solid #f0f1f3;
-  border-bottom:1px solid #f0f1f3;
-}
-
-.ea-product-meta>div{
-  display:grid;
-  gap:3px;
-}
-
-.ea-product-meta span{
-  color:#969aa1;
-  font-size:8px;
-}
-
-.ea-product-meta b{
-  font-size:10px;
-}
-
-.ea-product-actions{
-  display:flex;
-  gap:7px;
-}
-
-.ea-product-actions .ea-btn{
-  flex:1;
-}
-
-.ea-product-editor{
-  display:grid;
-  grid-template-columns:1.2fr .8fr;
-  gap:25px;
-}
-
-.ea-form-grid{
-  display:grid;
-  grid-template-columns:repeat(2,minmax(0,1fr));
-  gap:14px;
-}
-
-.ea-image-box{
-  border:1px solid var(--ea-border);
-  border-radius:13px;
-  padding:15px;
-}
-
-.ea-image-box h3{
-  margin:0;
-  font-size:12px;
-}
-
-.ea-image-box>p{
-  margin:4px 0 13px;
-  color:#92969d;
-  font-size:9px;
-}
-
-.ea-product-images{
-  display:grid;
-  grid-template-columns:repeat(2,1fr);
   gap:9px;
 }
 
-.ea-product-image,
-.ea-upload{
+.ad-search{
   position:relative;
-  aspect-ratio:1;
-  overflow:hidden;
-  border-radius:10px;
-  border:1px solid var(--ea-border);
+  flex:1;
+  max-width:480px;
 }
 
-.ea-product-image img{
+.ad-search>span{
+  position:absolute;
+  z-index:2;
+  left:13px;
+  top:50%;
+  transform:translateY(-50%);
+  color:#909B94;
+  font-size:16px;
+}
+
+.ad-search input{
   width:100%;
-  height:100%;
-  object-fit:cover;
+  min-height:42px;
+  padding:0 13px 0 38px;
+  border:1px solid var(--border);
+  border-radius:11px;
+  outline:0;
+  background:#fff;
+  color:var(--ink);
+  font-size:10px;
 }
 
-.ea-upload{
-  border-style:dashed;
+.ad-input,
+.ad-select{
+  min-height:42px;
+  width:100%;
+  padding:9px 11px;
+  border:1px solid #DDE4DE;
+  border-radius:10px;
+  outline:0;
+  background:#fff;
+  color:#25352B;
+  font-size:10px;
+}
+
+.ad-select{
+  width:auto;
+  min-width:135px;
+}
+
+.ad-input:focus,
+.ad-select:focus,
+.ad-search input:focus{
+  border-color:#8AA193;
+  box-shadow:0 0 0 3px rgba(23,57,43,.055);
+}
+
+textarea.ad-input{
+  resize:vertical;
+}
+
+.ad-field{
+  display:grid;
+  gap:6px;
+}
+
+.ad-field>span{
+  color:#58675E;
+  font-size:9px;
+  font-weight:600;
+}
+
+.ad-btn{
+  min-height:40px;
+  padding:0 14px;
+  border:1px solid transparent;
+  border-radius:10px;
+  cursor:pointer;
+  font-size:9px;
+  font-weight:700;
+  white-space:nowrap;
+}
+
+.ad-btn-primary{
+  background:var(--green);
+  color:var(--cream-2);
+  box-shadow:0 6px 15px rgba(23,57,43,.12);
+}
+
+.ad-btn-primary:hover{
+  background:var(--green-2);
+}
+
+.ad-btn-light{
+  background:#fff;
+  color:var(--green);
+  border-color:#DDE4DE;
+}
+
+.ad-btn-danger{
+  background:#fff;
+  color:var(--danger);
+  border-color:#EED9D7;
+}
+
+.ad-link{
+  border:0;
+  background:transparent;
+  color:#6B796F;
+  font-size:9px;
+  font-weight:700;
+  cursor:pointer;
+}
+
+.ad-round-btn{
+  width:34px;
+  height:34px;
+  border:1px solid var(--border);
+  border-radius:9px;
+  background:#fff;
+  color:var(--green);
+  cursor:pointer;
+}
+
+.ad-round-btn.danger{
+  color:var(--danger);
+}
+
+/* ---------- MODAL ---------- */
+
+.ad-modal-backdrop{
+  position:fixed;
+  z-index:150;
+  inset:0;
+  padding:20px;
   display:grid;
   place-items:center;
-  align-content:center;
-  gap:3px;
-  cursor:pointer;
-  color:#898e96;
+  background:rgba(9,28,20,.58);
+  backdrop-filter:blur(6px);
 }
 
-.ea-upload b{
-  font-size:20px;
+.ad-modal{
+  width:min(580px,100%);
+  max-height:92vh;
+  overflow:auto;
+  background:#FAFBF8;
+  border:1px solid rgba(255,255,255,.2);
+  border-radius:20px;
+  box-shadow:0 30px 100px rgba(0,0,0,.25);
 }
 
-.ea-upload span{
-  font-size:9px;
+.ad-modal-wide{
+  width:min(960px,100%);
 }
 
-.ea-main-photo{
-  position:absolute;
-  left:6px;
-  bottom:6px;
-  background:#111318;
-  color:#fff;
-  border-radius:99px;
-  padding:3px 6px;
+.ad-modal-head{
+  position:sticky;
+  z-index:5;
+  top:0;
+  padding:19px 22px;
+  background:rgba(255,255,255,.96);
+  border-bottom:1px solid var(--border);
+  display:flex;
+  align-items:flex-start;
+  justify-content:space-between;
+  gap:15px;
+  backdrop-filter:blur(15px);
+}
+
+.ad-modal-head>div>span{
+  color:#9B8B64;
   font-size:8px;
+  font-weight:700;
+  letter-spacing:.13em;
 }
 
-.ea-photo-delete,
-.ea-photo-main{
-  position:absolute;
-  border:0;
-  width:25px;
-  height:25px;
-  border-radius:50%;
-  background:rgba(17,19,24,.82);
-  color:#fff;
-  cursor:pointer;
+.ad-modal-head h2{
+  margin:4px 0 0;
+  color:var(--green);
+  font-size:18px;
 }
 
-.ea-photo-delete{
-  right:6px;
-  top:6px;
-}
-
-.ea-photo-main{
-  left:6px;
-  bottom:6px;
-}
-
-.ea-mini-stats{
-  display:grid;
-  grid-template-columns:repeat(3,1fr);
-  gap:12px;
-  margin-bottom:16px;
-}
-
-.ea-mini-stats>div{
-  border:1px solid var(--ea-border);
-  border-radius:13px;
-  background:#fff;
-  padding:14px;
-  display:grid;
-  gap:4px;
-}
-
-.ea-mini-stats span{
-  color:#8f949b;
+.ad-modal-head p{
+  margin:4px 0 0;
+  color:#8B958E;
   font-size:9px;
 }
 
-.ea-mini-stats b{
-  font-size:20px;
-}
-
-.ea-stepper{
-  display:inline-flex;
-  align-items:center;
-  gap:7px;
-  border:1px solid var(--ea-border);
-  border-radius:9px;
-  padding:3px;
-}
-
-.ea-stepper button{
-  width:28px;
-  height:27px;
-  border:0;
-  border-radius:6px;
-  background:#f3f4f5;
-  cursor:pointer;
-}
-
-.ea-stepper b{
-  min-width:25px;
-  text-align:center;
-}
-
-.ea-small-input{
-  width:75px;
-  height:34px;
-  border:1px solid var(--ea-border);
-  border-radius:8px;
-  padding:0 8px;
-}
-
-.ea-create-bar{
-  display:grid;
-  grid-template-columns:1fr minmax(200px,350px) auto;
-  align-items:end;
-  gap:12px;
+.ad-modal-head>button{
+  width:36px;
+  height:36px;
+  border:1px solid var(--border);
+  border-radius:10px;
   background:#fff;
-  border:1px solid var(--ea-border);
-  border-radius:15px;
-  padding:18px;
+  color:var(--green);
+  cursor:pointer;
+  font-size:19px;
+}
+
+.ad-modal-content{
+  padding:22px;
+}
+
+.ad-modal-actions{
+  padding-top:18px;
+  margin-top:20px;
+  border-top:1px solid var(--border);
+  display:flex;
+  justify-content:flex-end;
+  gap:8px;
+}
+
+/* ---------- ORDER DETAILS ---------- */
+
+.ad-summary-grid{
+  display:grid;
+  grid-template-columns:repeat(4,1fr);
+  gap:9px;
   margin-bottom:17px;
 }
 
-.ea-create-bar h3{
-  margin:3px 0 0;
-  font-size:14px;
-}
-
-.ea-category-grid{
-  display:grid;
-  grid-template-columns:repeat(2,minmax(0,1fr));
-  gap:15px;
-}
-
-.ea-chips{
-  min-height:45px;
-  display:flex;
-  flex-wrap:wrap;
-  align-items:flex-start;
-  gap:6px;
-  margin-bottom:12px;
-}
-
-.ea-chip{
-  display:inline-flex;
-  align-items:center;
-  gap:6px;
-  border:1px solid var(--ea-border);
-  border-radius:99px;
-  padding:5px 6px 5px 10px;
-  font-size:10px;
-}
-
-.ea-chip button{
-  border:0;
-  background:#f0f1f3;
-  width:19px;
-  height:19px;
-  border-radius:50%;
-  cursor:pointer;
-}
-
-.ea-muted{
-  color:#969aa1;
-  font-size:10px;
-}
-
-.ea-inline-add{
-  display:flex;
-  gap:7px;
-}
-
-.ea-customer-grid{
-  display:grid;
-  grid-template-columns:repeat(3,minmax(0,1fr));
-  gap:14px;
-}
-
-.ea-customer-card{
-  border:1px solid var(--ea-border);
-  border-radius:15px;
+.ad-summary-grid>div{
+  min-height:70px;
+  padding:12px;
+  border:1px solid var(--border);
+  border-radius:12px;
   background:#fff;
-  padding:16px;
-  text-align:left;
-  cursor:pointer;
-}
-
-.ea-customer-avatar{
-  width:42px;
-  height:42px;
-  border-radius:13px;
-  background:#111318;
-  color:#fff;
   display:grid;
-  place-items:center;
-  font-weight:800;
-  margin-bottom:12px;
+  align-content:center;
+  gap:4px;
 }
 
-.ea-customer-name h3{
-  margin:0;
-  font-size:13px;
+.ad-summary-grid span{
+  color:#929C95;
+  font-size:8px;
 }
 
-.ea-customer-name span{
-  display:block;
-  margin-top:3px;
-  color:#92969d;
-  font-size:9px;
+.ad-summary-grid b{
+  color:var(--green);
+  font-size:10px;
 }
 
-.ea-customer-numbers{
+.ad-two-col{
   display:grid;
   grid-template-columns:1fr 1fr;
-  gap:10px;
-  margin-top:14px;
-  padding-top:12px;
-  border-top:1px solid #f0f1f3;
+  gap:13px;
 }
 
-.ea-customer-numbers>div{
+.ad-inner-card{
+  padding:15px;
+  margin-bottom:12px;
+  border:1px solid var(--border);
+  border-radius:14px;
+  background:#fff;
+}
+
+.ad-inner-card h3{
+  margin:0 0 12px;
+  color:var(--green);
+  font-size:12px;
+}
+
+.ad-line{
+  min-height:48px;
+  border-bottom:1px solid #EEF1EE;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:12px;
+}
+
+.ad-line:last-child{
+  border-bottom:0;
+}
+
+.ad-line>div{
   display:grid;
   gap:2px;
 }
 
-.ea-customer-numbers b{
-  font-size:11px;
+.ad-line b{
+  color:#314038;
+  font-size:9px;
 }
 
-.ea-customer-numbers span{
-  color:#9a9ea5;
+.ad-line span{
+  color:#929B95;
   font-size:8px;
 }
 
-.ea-filter-tabs{
-  display:flex;
-  gap:5px;
-  margin-bottom:15px;
+.ad-line-right{
+  justify-items:end;
 }
 
-.ea-filter-tabs button{
-  border:1px solid var(--ea-border);
-  background:#fff;
-  padding:8px 12px;
-  border-radius:9px;
-  color:#777c84;
-  font-size:10px;
-  cursor:pointer;
-}
-
-.ea-filter-tabs button.active{
-  background:#111318;
-  color:#fff;
-  border-color:#111318;
-}
-
-.ea-review-grid{
+.ad-info-row{
+  padding:8px 0;
   display:grid;
-  grid-template-columns:repeat(2,minmax(0,1fr));
+  gap:3px;
+}
+
+.ad-info-row span{
+  color:#909A93;
+  font-size:8px;
+}
+
+.ad-info-row b{
+  color:#35433B;
+  font-size:9px;
+}
+
+/* ---------- PRODUCT ---------- */
+
+.ad-product-grid{
+  display:grid;
+  grid-template-columns:repeat(3,minmax(0,1fr));
   gap:14px;
 }
 
-.ea-review{
-  border:1px solid var(--ea-border);
+.ad-product-card{
+  overflow:hidden;
   background:#fff;
-  border-radius:15px;
-  padding:17px;
+  border:1px solid var(--border);
+  border-radius:17px;
+  transition:.2s;
 }
 
-.ea-review-top{
+.ad-product-card:hover{
+  transform:translateY(-2px);
+  box-shadow:0 13px 35px rgba(23,57,43,.07);
+}
+
+.ad-product-photo{
+  position:relative;
+  aspect-ratio:4/3;
+  overflow:hidden;
+  background:var(--cream);
+}
+
+.ad-product-photo img{
+  width:100%;
+  height:100%;
+  object-fit:cover;
+  display:block;
+}
+
+.ad-photo-placeholder{
+  width:100%;
+  height:100%;
+  display:grid;
+  place-items:center;
+  color:#A59C84;
+  font-size:35px;
+}
+
+.ad-live,
+.ad-product-tag{
+  position:absolute;
+  top:10px;
+  padding:5px 8px;
+  border-radius:30px;
+  background:rgba(255,255,255,.94);
+  box-shadow:0 3px 13px rgba(0,0,0,.08);
+  font-size:8px;
+  font-weight:700;
+}
+
+.ad-live{
+  left:10px;
+  color:#397459;
+}
+
+.ad-live.hidden{
+  color:#A34D49;
+}
+
+.ad-product-tag{
+  right:10px;
+  color:#816E42;
+}
+
+.ad-product-info{
+  padding:15px;
+}
+
+.ad-product-category{
+  color:#98875D;
+  font-size:8px;
+  font-weight:700;
+  text-transform:uppercase;
+  letter-spacing:.09em;
+}
+
+.ad-product-info h3{
+  margin:5px 0 2px;
+  color:var(--green);
+  font-size:13px;
+}
+
+.ad-product-info>p{
+  margin:0;
+  color:#9BA39D;
+  font-size:8px;
+}
+
+.ad-product-data{
+  margin:14px 0;
+  padding:11px 0;
+  border-top:1px solid #EEF1EE;
+  border-bottom:1px solid #EEF1EE;
+  display:grid;
+  grid-template-columns:1fr .7fr 1.2fr;
+  gap:8px;
+}
+
+.ad-product-data>div{
+  min-width:0;
+  display:grid;
+  gap:3px;
+}
+
+.ad-product-data>div>span{
+  color:#9AA29D;
+  font-size:7px;
+}
+
+.ad-product-data b{
+  color:#35443A;
+  font-size:9px;
+}
+
+.ad-product-buttons{
+  display:flex;
+  gap:6px;
+}
+
+.ad-product-buttons .ad-btn{
+  flex:1;
+}
+
+.ad-icon-action{
+  width:40px;
+  min-height:40px;
+  border:1px solid var(--border);
+  border-radius:10px;
+  background:#fff;
+  color:var(--green);
+  cursor:pointer;
+}
+
+.ad-icon-action.danger{
+  color:var(--danger);
+}
+
+.ad-product-editor{
+  display:grid;
+  gap:14px;
+}
+
+.ad-form-section{
+  padding:17px;
+  border:1px solid var(--border);
+  border-radius:15px;
+  background:#fff;
+}
+
+.ad-form-section-title{
+  margin-bottom:16px;
+  display:flex;
+  align-items:flex-start;
+  gap:10px;
+}
+
+.ad-form-section-title>span{
+  width:30px;
+  height:30px;
+  flex:none;
+  border-radius:50%;
+  display:grid;
+  place-items:center;
+  background:var(--cream-2);
+  color:var(--green);
+  font-size:8px;
+  font-weight:700;
+}
+
+.ad-form-section-title h3{
+  margin:0;
+  color:var(--green);
+  font-size:12px;
+}
+
+.ad-form-section-title p{
+  margin:3px 0 0;
+  color:#929C95;
+  font-size:8px;
+}
+
+.ad-form-grid{
+  display:grid;
+  grid-template-columns:repeat(2,minmax(0,1fr));
+  gap:12px;
+}
+
+.ad-visibility{
+  min-height:63px;
+  margin-top:13px;
+  padding:11px 13px;
+  border-radius:12px;
+  background:#F7F8F5;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:15px;
+}
+
+.ad-visibility>div{
+  display:grid;
+  gap:3px;
+}
+
+.ad-visibility b{
+  color:#35443A;
+  font-size:9px;
+}
+
+.ad-visibility span{
+  color:#929B95;
+  font-size:8px;
+}
+
+.ad-toggle{
+  width:42px;
+  height:23px;
+  padding:3px;
+  border:0;
+  border-radius:30px;
+  background:#CCD4CF;
+  cursor:pointer;
+  transition:.2s;
+}
+
+.ad-toggle span{
+  display:block;
+  width:17px;
+  height:17px;
+  border-radius:50%;
+  background:#fff;
+  transition:.2s;
+}
+
+.ad-toggle.on{
+  background:var(--green);
+}
+
+.ad-toggle.on span{
+  transform:translateX(19px);
+}
+
+.ad-image-grid{
+  display:grid;
+  grid-template-columns:repeat(4,1fr);
+  gap:9px;
+}
+
+.ad-product-image,
+.ad-image-upload{
+  position:relative;
+  aspect-ratio:1;
+  overflow:hidden;
+  border-radius:12px;
+}
+
+.ad-product-image{
+  border:1px solid var(--border);
+}
+
+.ad-product-image img{
+  width:100%;
+  height:100%;
+  object-fit:cover;
+}
+
+.ad-image-upload{
+  border:1px dashed #B9C8BE;
+  background:#F9FAF7;
+  color:#75857B;
+  display:grid;
+  place-items:center;
+  align-content:center;
+  gap:3px;
+  cursor:pointer;
+}
+
+.ad-image-upload>div{
+  color:var(--green);
+  font-size:22px;
+}
+
+.ad-image-upload b{
+  font-size:9px;
+}
+
+.ad-image-upload span{
+  font-size:7px;
+  color:#A0A8A2;
+}
+
+.ad-main-image{
+  position:absolute;
+  left:6px;
+  bottom:6px;
+  padding:4px 7px;
+  border-radius:20px;
+  background:var(--green);
+  color:var(--cream-2);
+  font-size:7px;
+}
+
+.ad-remove-image,
+.ad-make-main{
+  position:absolute;
+  width:25px;
+  height:25px;
+  border:0;
+  border-radius:50%;
+  background:rgba(23,57,43,.9);
+  color:#fff;
+  cursor:pointer;
+}
+
+.ad-remove-image{
+  top:6px;
+  right:6px;
+}
+
+.ad-make-main{
+  bottom:6px;
+  left:6px;
+}
+
+/* ---------- INVENTORY ---------- */
+
+.ad-mini-stats{
+  margin-bottom:15px;
+  display:grid;
+  grid-template-columns:repeat(3,1fr);
+  gap:11px;
+}
+
+.ad-mini-stats>div{
+  min-height:90px;
+  padding:15px;
+  border:1px solid var(--border);
+  border-radius:15px;
+  background:#fff;
+  display:grid;
+  align-content:center;
+  gap:5px;
+}
+
+.ad-mini-stats span{
+  color:#909A93;
+  font-size:8px;
+}
+
+.ad-mini-stats b{
+  color:var(--green);
+  font-family:"Bricolage Grotesque",sans-serif;
+  font-size:21px;
+}
+
+.ad-stepper{
+  width:max-content;
+  padding:3px;
+  border:1px solid var(--border);
+  border-radius:9px;
+  display:flex;
+  align-items:center;
+  gap:6px;
+}
+
+.ad-stepper button{
+  width:27px;
+  height:27px;
+  border:0;
+  border-radius:6px;
+  background:var(--green-soft);
+  color:var(--green);
+  cursor:pointer;
+}
+
+.ad-stepper b{
+  min-width:25px;
+  text-align:center;
+}
+
+.ad-number{
+  width:72px;
+  height:34px;
+  padding:0 8px;
+  border:1px solid var(--border);
+  border-radius:8px;
+  outline:0;
+}
+
+.ad-table-product{
   display:flex;
   align-items:center;
   gap:9px;
 }
 
-.ea-review-top>div:nth-child(2){
-  flex:1;
-  display:grid;
+.ad-table-product img,
+.ad-table-product>span{
+  width:38px;
+  height:38px;
+  flex:none;
+  border-radius:9px;
 }
 
-.ea-review-top h3{
-  margin:0;
-  font-size:11px;
-}
-
-.ea-review-top span{
-  color:#999da4;
-  font-size:8px;
-}
-
-.ea-stars{
-  margin:13px 0 8px;
-  color:#dca52f;
-  letter-spacing:2px;
-  font-size:13px;
-}
-
-.ea-stars span{
-  color:#e5e6e8;
-}
-
-.ea-review-product{
-  font-size:10px;
-}
-
-.ea-review p{
-  color:#696f77;
-  font-size:10px;
-  line-height:1.6;
-}
-
-.ea-review-actions{
-  display:flex;
-  gap:6px;
-  margin-top:12px;
-}
-
-.ea-section-actions{
-  display:flex;
-  justify-content:space-between;
-  align-items:center;
-  gap:15px;
-  margin-bottom:15px;
-}
-
-.ea-section-actions p{
-  margin:0;
-  color:#777c84;
-  font-size:11px;
-}
-
-.ea-hero-card{
-  display:grid;
-  grid-template-columns:minmax(300px,.8fr) 1.2fr;
-  overflow:hidden;
-  background:#fff;
-  border:1px solid var(--ea-border);
-  border-radius:16px;
-  margin-bottom:15px;
-}
-
-.ea-hero-preview{
-  position:relative;
-  min-height:280px;
-  background:#eceef0;
-}
-
-.ea-hero-preview img{
-  width:100%;
-  height:100%;
-  position:absolute;
-  inset:0;
+.ad-table-product img{
   object-fit:cover;
 }
 
-.ea-hero-empty{
+.ad-table-product>span{
+  background:var(--cream);
+  color:#9A8B65;
+  display:grid;
+  place-items:center;
+}
+
+.ad-table-product>div{
+  display:grid;
+}
+
+/* ---------- CATEGORY ---------- */
+
+.ad-create-category{
+  margin-bottom:15px;
+  padding:18px;
+  border:1px solid var(--border);
+  border-radius:17px;
+  background:#fff;
+  display:grid;
+  grid-template-columns:1fr minmax(220px,360px) auto;
+  align-items:end;
+  gap:12px;
+}
+
+.ad-create-category h2{
+  margin:4px 0 2px;
+  color:var(--green);
+  font-size:15px;
+}
+
+.ad-create-category p{
+  margin:0;
+  color:#909A93;
+  font-size:9px;
+}
+
+.ad-category-grid{
+  display:grid;
+  grid-template-columns:repeat(2,1fr);
+  gap:14px;
+}
+
+.ad-subcategories{
+  min-height:55px;
+  display:flex;
+  flex-wrap:wrap;
+  align-items:flex-start;
+  gap:6px;
+  margin-bottom:12px;
+}
+
+.ad-subcategories>span{
+  padding:5px 6px 5px 9px;
+  border:1px solid var(--border);
+  border-radius:30px;
+  display:flex;
+  align-items:center;
+  gap:6px;
+  color:#5F6D64;
+  font-size:8px;
+}
+
+.ad-subcategories button{
+  width:18px;
+  height:18px;
+  border:0;
+  border-radius:50%;
+  background:#EEF1EE;
+  color:#6F7A73;
+  cursor:pointer;
+}
+
+.ad-inline-form{
+  display:flex;
+  gap:7px;
+}
+
+/* ---------- CUSTOMERS ---------- */
+
+.ad-customer-grid{
+  display:grid;
+  grid-template-columns:repeat(3,1fr);
+  gap:13px;
+}
+
+.ad-customer{
+  position:relative;
+  padding:16px;
+  border:1px solid var(--border);
+  border-radius:16px;
+  background:#fff;
+  cursor:pointer;
+  text-align:left;
+  transition:.2s;
+}
+
+.ad-customer:hover{
+  transform:translateY(-2px);
+  border-color:#CAD7CE;
+}
+
+.ad-customer-avatar{
+  width:44px;
+  height:44px;
+  margin-bottom:11px;
+  border-radius:14px;
+  background:var(--green);
+  color:var(--cream-2);
+  display:grid;
+  place-items:center;
+  font-family:"Bricolage Grotesque",sans-serif;
+  font-weight:700;
+}
+
+.ad-customer-main h3{
+  margin:0;
+  color:var(--green);
+  font-size:12px;
+}
+
+.ad-customer-main span{
+  display:block;
+  margin-top:3px;
+  color:#949D97;
+  font-size:8px;
+}
+
+.ad-customer-stats{
+  margin-top:13px;
+  padding-top:11px;
+  border-top:1px solid #EEF1EE;
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:8px;
+}
+
+.ad-customer-stats>div{
+  display:grid;
+  gap:2px;
+}
+
+.ad-customer-stats b{
+  color:#3C4A41;
+  font-size:9px;
+}
+
+.ad-customer-stats span{
+  color:#9BA39E;
+  font-size:7px;
+}
+
+.ad-customer-arrow{
+  position:absolute;
+  right:15px;
+  top:15px;
+  color:#9BA69F;
+}
+
+/* ---------- REVIEWS ---------- */
+
+.ad-tabs{
+  display:flex;
+  flex-wrap:wrap;
+  gap:5px;
+  margin-bottom:14px;
+}
+
+.ad-tabs button{
+  min-height:35px;
+  padding:0 12px;
+  border:1px solid var(--border);
+  border-radius:9px;
+  background:#fff;
+  color:#748078;
+  cursor:pointer;
+  font-size:8px;
+}
+
+.ad-tabs button.active{
+  border-color:var(--green);
+  background:var(--green);
+  color:var(--cream-2);
+}
+
+.ad-review-grid{
+  display:grid;
+  grid-template-columns:repeat(2,1fr);
+  gap:13px;
+}
+
+.ad-review-card{
+  padding:17px;
+  border:1px solid var(--border);
+  border-radius:16px;
+  background:#fff;
+}
+
+.ad-review-head{
+  display:flex;
+  align-items:center;
+  gap:9px;
+}
+
+.ad-review-avatar{
+  width:37px;
+  height:37px;
+  flex:none;
+  border-radius:50%;
+  background:var(--green-soft);
+  color:var(--green);
+  display:grid;
+  place-items:center;
+  font-size:10px;
+  font-weight:700;
+}
+
+.ad-review-head>div:nth-child(2){
+  flex:1;
+  display:grid;
+  gap:2px;
+}
+
+.ad-review-head h3{
+  margin:0;
+  color:#35433B;
+  font-size:10px;
+}
+
+.ad-review-head span{
+  color:#9BA39E;
+  font-size:7px;
+}
+
+.ad-stars{
+  margin:13px 0 8px;
+  font-size:12px;
+  letter-spacing:1px;
+}
+
+.ad-stars b{
+  color:#C6A45B;
+}
+
+.ad-stars span{
+  color:#E3E6E3;
+}
+
+.ad-review-product{
+  color:#6D796F;
+  font-size:8px;
+  font-weight:700;
+}
+
+.ad-review-card>p{
+  min-height:42px;
+  color:#657168;
+  font-size:9px;
+  line-height:1.6;
+}
+
+.ad-review-actions{
+  display:flex;
+  gap:6px;
+}
+
+/* ---------- HERO ---------- */
+
+.ad-section-intro{
+  margin-bottom:15px;
+  padding:18px 20px;
+  border-radius:17px;
+  background:var(--green);
+  color:#fff;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:20px;
+}
+
+.ad-section-intro h2{
+  margin:4px 0 2px;
+  color:var(--cream-2);
+  font-size:17px;
+}
+
+.ad-section-intro p{
+  margin:0;
+  color:#A9BBB0;
+  font-size:9px;
+}
+
+.ad-section-intro .ad-btn-primary{
+  background:var(--cream-2);
+  color:var(--green);
+}
+
+.ad-hero-card{
+  margin-bottom:14px;
+  overflow:hidden;
+  border:1px solid var(--border);
+  border-radius:18px;
+  background:#fff;
+  display:grid;
+  grid-template-columns:minmax(300px,.85fr) 1.15fr;
+}
+
+.ad-hero-preview{
+  position:relative;
+  min-height:310px;
+  background:var(--cream);
+}
+
+.ad-hero-preview>img{
+  position:absolute;
+  inset:0;
+  width:100%;
   height:100%;
-  min-height:280px;
+  object-fit:cover;
+}
+
+.ad-hero-placeholder{
+  width:100%;
+  height:100%;
+  min-height:310px;
   display:grid;
   place-items:center;
   align-content:center;
-  color:#969ba3;
+  gap:3px;
+  color:#8E8264;
 }
 
-.ea-hero-empty b{
-  font-size:25px;
+.ad-hero-placeholder>span{
+  font-size:29px;
 }
 
-.ea-hero-empty span{
+.ad-hero-placeholder b{
   font-size:10px;
 }
 
-.ea-change-image{
+.ad-hero-placeholder small{
+  font-size:8px;
+}
+
+.ad-upload-banner{
   position:absolute;
-  left:12px;
-  bottom:12px;
+  left:13px;
+  bottom:13px;
   padding:8px 11px;
   border-radius:9px;
-  background:#fff;
-  box-shadow:0 5px 20px rgba(0,0,0,.12);
-  font-size:10px;
+  background:rgba(255,255,255,.95);
+  color:var(--green);
+  box-shadow:0 5px 18px rgba(0,0,0,.1);
+  font-size:8px;
   font-weight:700;
   cursor:pointer;
 }
 
-.ea-hero-editor{
+.ad-banner-number{
+  position:absolute;
+  right:13px;
+  top:13px;
+  width:34px;
+  height:34px;
+  border-radius:50%;
+  display:grid;
+  place-items:center;
+  background:rgba(23,57,43,.9);
+  color:var(--cream-2);
+  font-size:8px;
+  font-weight:700;
+}
+
+.ad-hero-form{
   padding:20px;
 }
 
-.ea-row-buttons{
+.ad-small-actions{
   display:flex;
-  gap:6px;
-  flex-wrap:wrap;
+  gap:5px;
 }
 
-.coupon-grid{
+.ad-small-actions button{
+  width:32px;
+  height:32px;
+  border:1px solid var(--border);
+  border-radius:8px;
+  background:#fff;
+  color:var(--green);
+  cursor:pointer;
+}
+
+.ad-small-actions button.danger{
+  color:var(--danger);
+}
+
+.ad-small-actions button:disabled{
+  opacity:.35;
+  cursor:not-allowed;
+}
+
+/* ---------- COUPON ---------- */
+
+.ad-coupon-form{
+  display:grid;
   grid-template-columns:repeat(3,1fr);
+  gap:12px;
   margin-bottom:14px;
 }
 
@@ -5116,501 +7420,797 @@ textarea.ea-input{
   text-transform:uppercase;
 }
 
-.ea-coupon-grid{
+.ad-coupon-grid{
   display:grid;
-  grid-template-columns:repeat(2,minmax(0,1fr));
-  gap:14px;
+  grid-template-columns:repeat(2,1fr);
+  gap:13px;
 }
 
-.ea-coupon{
-  display:flex;
+.ad-coupon{
   min-height:220px;
   overflow:hidden;
-  border:1px solid var(--ea-border);
-  border-radius:15px;
+  display:flex;
+  border:1px solid var(--border);
+  border-radius:17px;
   background:#fff;
 }
 
-.ea-coupon-side{
-  width:80px;
-  background:#111318;
-  color:#fff;
+.ad-coupon-strip{
+  width:73px;
+  padding:14px 6px;
+  background:var(--green);
+  color:var(--cream-2);
   display:flex;
   flex-direction:column;
   justify-content:space-between;
   align-items:center;
-  padding:15px 5px;
 }
 
-.ea-coupon-side span{
+.ad-coupon-strip span{
   writing-mode:vertical-rl;
   transform:rotate(180deg);
-  font-size:8px;
-  letter-spacing:.18em;
+  font-size:7px;
+  letter-spacing:.17em;
 }
 
-.ea-coupon-side b{
-  font-size:26px;
+.ad-coupon-strip b{
+  font-size:25px;
 }
 
-.ea-coupon-content{
+.ad-coupon-main{
   flex:1;
   padding:17px;
 }
 
-.ea-discount{
+.ad-discount{
   display:block;
   margin:15px 0;
+  color:var(--green);
+  font-family:"Bricolage Grotesque",sans-serif;
   font-size:24px;
   letter-spacing:-.04em;
 }
 
-.ea-coupon-info{
+.ad-coupon-details{
+  margin-bottom:13px;
   display:grid;
   gap:4px;
-  color:#858a92;
-  font-size:9px;
-  margin-bottom:14px;
+  color:#8C968F;
+  font-size:8px;
 }
 
-.ea-team-grid{
+.ad-row-actions{
+  display:flex;
+  gap:6px;
+}
+
+/* ---------- TEAM ---------- */
+
+.ad-team-list{
   display:grid;
-  gap:10px;
-  margin-bottom:18px;
+  gap:9px;
+  margin-bottom:17px;
 }
 
-.ea-team-card{
+.ad-team-member{
+  padding:13px;
+  border:1px solid var(--border);
+  border-radius:15px;
+  background:#fff;
   display:flex;
   align-items:center;
-  gap:12px;
-  background:#fff;
-  border:1px solid var(--ea-border);
-  border-radius:14px;
-  padding:14px;
+  gap:11px;
 }
 
-.ea-team-avatar{
-  width:44px;
-  height:44px;
+.ad-team-avatar{
+  width:43px;
+  height:43px;
+  flex:none;
   border-radius:13px;
-  background:#111318;
-  color:#fff;
   display:grid;
   place-items:center;
-  font-weight:800;
+  background:var(--green);
+  color:var(--cream-2);
+  font-weight:700;
 }
 
-.ea-team-info{
+.ad-team-info{
   flex:1;
   display:grid;
-  gap:3px;
+  gap:2px;
 }
 
-.ea-team-info h3{
+.ad-team-info h3{
   margin:0;
-  font-size:12px;
+  color:#35443A;
+  font-size:10px;
 }
 
-.ea-team-info h3 small{
-  color:#979ba2;
+.ad-team-info h3 small{
+  color:#A0A8A2;
+  font-size:7px;
+  font-weight:400;
+}
+
+.ad-team-info span{
+  color:#929C95;
   font-size:8px;
-  font-weight:500;
 }
 
-.ea-team-info>span{
-  color:#8f949b;
-  font-size:9px;
-}
-
-.ea-team-controls{
+.ad-team-actions{
   display:flex;
   align-items:center;
   gap:6px;
 }
 
-.ea-team-controls .ea-input{
-  width:120px;
-}
-
-.ea-permission{
+.ad-permission-row{
+  padding:10px 0;
+  border-bottom:1px solid #EEF1EE;
   display:grid;
   grid-template-columns:100px 1fr;
   gap:12px;
-  padding:10px 0;
-  border-bottom:1px solid #f0f1f3;
 }
 
-.ea-permission:last-child{
+.ad-permission-row:last-child{
   border:0;
 }
 
-.ea-permission b{
-  font-size:10px;
-}
-
-.ea-permission span{
-  color:#848991;
+.ad-permission-row b{
+  color:var(--green);
   font-size:9px;
 }
 
-.ea-timeline{
-  position:relative;
+.ad-permission-row span{
+  color:#88938C;
+  font-size:8px;
 }
 
-.ea-timeline-item{
-  position:relative;
+/* ---------- AUDIT ---------- */
+
+.ad-log{
+  min-height:72px;
   display:grid;
   grid-template-columns:18px 1fr;
-  gap:10px;
+  gap:8px;
 }
 
-.ea-timeline-item:not(:last-child):before{
+.ad-log-line{
+  position:relative;
+  display:flex;
+  justify-content:center;
+}
+
+.ad-log-line:after{
   content:"";
   position:absolute;
-  left:5px;
   top:15px;
-  bottom:-8px;
+  bottom:0;
   width:1px;
-  background:#e5e7ea;
+  background:#E0E6E1;
 }
 
-.ea-timeline-dot{
+.ad-log:last-child .ad-log-line:after{
+  display:none;
+}
+
+.ad-log-line span{
   position:relative;
-  z-index:1;
-  width:11px;
-  height:11px;
-  margin-top:5px;
-  border:3px solid #111318;
+  z-index:2;
+  width:10px;
+  height:10px;
+  margin-top:4px;
+  border:3px solid var(--green);
   border-radius:50%;
   background:#fff;
 }
 
-.ea-timeline-content{
-  padding-bottom:18px;
+.ad-log-content{
+  padding-bottom:17px;
 }
 
-.ea-timeline-content>div{
+.ad-log-content>div{
   display:flex;
   justify-content:space-between;
   gap:15px;
 }
 
-.ea-timeline-content b{
-  font-size:11px;
+.ad-log-content h3{
+  margin:0;
+  color:#35443A;
+  font-size:10px;
 }
 
-.ea-timeline-content span{
-  color:#999da4;
-  font-size:8px;
+.ad-log-content time{
+  color:#9CA49F;
+  font-size:7px;
 }
 
-.ea-timeline-content p{
+.ad-log-content p{
   margin:4px 0;
-  color:#696f77;
-  font-size:10px;
+  color:#69756D;
+  font-size:9px;
 }
 
-.ea-timeline-content small{
-  color:#9a9ea5;
-  font-size:8px;
+.ad-log-content small{
+  color:#A0A7A2;
+  font-size:7px;
 }
 
-.ea-alert{
-  padding:11px 13px;
-  margin-bottom:15px;
-  border:1px solid #f0cfcf;
-  background:#fff1f1;
-  color:#aa3e3e;
-  border-radius:10px;
-  font-size:10px;
-}
+/* ---------- EMPTY ---------- */
 
-.ea-overlay{
-  display:none;
-}
-
-.ea-login-page{
-  min-height:100vh;
-  background:#f5f5f6;
-  display:flex;
-  flex-direction:column;
-  align-items:center;
-  justify-content:center;
-  padding:30px 20px;
-  font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
-}
-
-.ea-login-brand{
+.ad-empty{
+  min-height:210px;
+  padding:30px 15px;
   display:grid;
   justify-items:center;
-  margin-bottom:24px;
+  align-content:center;
+  text-align:center;
 }
 
-.ea-login-brand b{
-  margin-top:10px;
-  font-size:14px;
-  letter-spacing:.13em;
+.ad-empty>div{
+  width:49px;
+  height:49px;
+  border-radius:50%;
+  display:grid;
+  place-items:center;
+  background:var(--cream);
+  color:#9B8B65;
+  font-size:20px;
 }
 
-.ea-login-brand>span{
-  margin-top:3px;
-  color:#999da4;
+.ad-empty h3{
+  margin:10px 0 3px;
+  color:var(--green);
+  font-size:12px;
+}
+
+.ad-empty p,
+.ad-muted{
+  margin:0;
+  color:#929C95;
+  font-size:9px;
+}
+
+.ad-warning{
+  margin-bottom:14px;
+  padding:11px 13px;
+  border:1px solid #E8CFC9;
+  border-radius:11px;
+  background:#FFF3EF;
+  color:#9A5148;
+  font-size:9px;
+}
+
+/* ============================================================
+   LOGIN
+============================================================ */
+
+.ad-login{
+  position:relative;
+  min-height:100vh;
+  overflow:hidden;
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  background:#F8F7F1;
+}
+
+.ad-login-decoration{
+  position:absolute;
+  pointer-events:none;
+  border-radius:50%;
+}
+
+.ad-dec-1{
+  width:420px;
+  height:420px;
+  left:-170px;
+  bottom:-180px;
+  border:1px solid rgba(232,212,165,.15);
+}
+
+.ad-dec-2{
+  width:260px;
+  height:260px;
+  left:31%;
+  top:-150px;
+  border:1px solid rgba(232,212,165,.12);
+}
+
+.ad-login-back{
+  position:absolute;
+  z-index:5;
+  top:25px;
+  right:28px;
+  border:0;
+  background:transparent;
+  color:#718077;
+  cursor:pointer;
+  font-size:9px;
+  font-weight:600;
+}
+
+.ad-login-panel{
+  position:relative;
+  padding:55px clamp(35px,6vw,90px);
+  background:var(--green);
+  color:#fff;
+  display:flex;
+  flex-direction:column;
+  justify-content:center;
+}
+
+.ad-login-brand{
+  position:absolute;
+  left:clamp(35px,6vw,90px);
+  top:35px;
+  display:flex;
+  align-items:center;
+  gap:11px;
+}
+
+.ad-login-logo{
+  width:42px;
+  height:42px;
+  border-radius:50%;
+  display:grid;
+  place-items:center;
+  background:var(--cream-2);
+  color:var(--green);
+  font-family:"Bricolage Grotesque",sans-serif;
+  font-size:12px;
+  font-weight:800;
+}
+
+.ad-login-brand>div:last-child{
+  display:grid;
+}
+
+.ad-login-brand strong{
+  font-family:"Bricolage Grotesque",sans-serif;
+  font-size:13px;
+  letter-spacing:.12em;
+}
+
+.ad-login-brand span{
+  color:#91A79B;
+  font-size:7px;
+  letter-spacing:.15em;
+}
+
+.ad-login-copy{
+  max-width:500px;
+  margin-bottom:38px;
+}
+
+.ad-login-copy>span{
+  color:var(--champagne);
   font-size:8px;
-  letter-spacing:.17em;
+  font-weight:700;
+  letter-spacing:.18em;
 }
 
-.ea-login-card{
-  width:min(420px,100%);
-  background:#fff;
-  border:1px solid #e6e8eb;
-  border-radius:20px;
-  padding:30px;
-  box-shadow:0 20px 60px rgba(20,20,30,.06);
+.ad-login-copy h1{
+  margin:12px 0 14px;
+  color:var(--cream-2);
+  font-size:clamp(50px,6vw,82px);
+  line-height:.88;
+  letter-spacing:-.065em;
 }
 
-.ea-login-card h1{
-  margin:5px 0 7px;
-  font-size:25px;
+.ad-login-copy p{
+  max-width:420px;
+  margin:0;
+  color:#AFC0B7;
+  font-size:11px;
+  line-height:1.75;
+}
+
+.ad-login-feature{
+  max-width:430px;
+  min-height:63px;
+  border-top:1px solid rgba(255,255,255,.1);
+  display:flex;
+  align-items:center;
+  gap:13px;
+}
+
+.ad-login-feature>div{
+  width:31px;
+  height:31px;
+  border-radius:50%;
+  display:grid;
+  place-items:center;
+  background:rgba(255,255,255,.06);
+  color:var(--champagne);
+  font-size:7px;
+}
+
+.ad-login-feature>span{
+  display:grid;
+  color:#91A79B;
+  font-size:8px;
+}
+
+.ad-login-feature b{
+  margin-bottom:2px;
+  color:#E8EFEA;
+  font-size:9px;
+}
+
+.ad-login-form-side{
+  display:grid;
+  place-items:center;
+  padding:70px 30px;
+}
+
+.ad-login-form{
+  width:min(410px,100%);
+}
+
+.ad-login-form-head{
+  margin-bottom:28px;
+}
+
+.ad-login-form-head>span{
+  color:#9B8B64;
+  font-size:8px;
+  font-weight:700;
+  letter-spacing:.16em;
+}
+
+.ad-login-form-head h2{
+  margin:8px 0 6px;
+  color:var(--green);
+  font-size:30px;
+  line-height:1.05;
   letter-spacing:-.04em;
 }
 
-.ea-login-card>p{
-  margin:0 0 22px;
-  color:#858a92;
-  font-size:11px;
-  line-height:1.6;
+.ad-login-form-head p{
+  margin:0;
+  color:#8B968F;
+  font-size:10px;
 }
 
-.ea-login-card .ea-field{
-  margin-bottom:13px;
+.ad-login-form .ad-field{
+  margin-bottom:14px;
 }
 
-.ea-login-button{
-  width:100%;
-  height:46px;
-  margin-top:5px;
+.ad-login-input{
+  min-height:49px;
+  padding-left:13px;
+  background:#fff;
+}
+
+.ad-password{
+  position:relative;
+}
+
+.ad-password .ad-input{
+  padding-right:60px;
+}
+
+.ad-password button{
+  position:absolute;
+  right:9px;
+  top:50%;
+  transform:translateY(-50%);
   border:0;
-  border-radius:11px;
-  background:#111318;
-  color:#fff;
-  padding:0 16px;
-  display:flex;
-  align-items:center;
-  justify-content:space-between;
+  background:transparent;
+  color:#718077;
+  font-size:8px;
   font-weight:700;
   cursor:pointer;
 }
 
-.ea-back{
-  display:block;
-  margin:16px auto 0;
-  border:0;
-  background:transparent;
-  color:#858a92;
-  font-size:10px;
-  cursor:pointer;
+.ad-login-input.error{
+  border-color:#C96C63;
 }
 
-.ea-login-footer{
-  margin-top:18px;
-  color:#aaaeb5;
+.ad-login-error{
+  margin:-3px 0 13px;
+  padding:9px 11px;
+  border-radius:9px;
+  background:#FBECEA;
+  color:#A64E47;
   font-size:8px;
 }
 
-.ea-error{
-  color:#bf4646;
-  font-size:9px;
+.ad-signin{
+  width:100%;
+  min-height:50px;
+  margin-top:4px;
+  padding:0 17px;
+  border:0;
+  border-radius:11px;
+  background:var(--green);
+  color:var(--cream-2);
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  cursor:pointer;
+  font-size:10px;
+  font-weight:700;
+  box-shadow:0 10px 25px rgba(23,57,43,.13);
 }
 
-.ea-input.error{
-  border-color:#d86464;
+.ad-signin b{
+  font-size:16px;
 }
 
-@media(max-width:1150px){
-  .ea-stats{
+.ad-login-hint{
+  margin-top:20px;
+  padding-top:16px;
+  border-top:1px solid #E3E7E2;
+}
+
+.ad-login-hint span{
+  color:#718078;
+  font-size:8px;
+  font-weight:700;
+}
+
+.ad-login-hint p{
+  margin:3px 0 0;
+  color:#9AA39D;
+  font-size:8px;
+  line-height:1.5;
+}
+
+.ad-login-footer{
+  position:absolute;
+  right:28px;
+  bottom:20px;
+  color:#A1A9A4;
+  font-size:7px;
+}
+
+/* ---------- RESPONSIVE ---------- */
+
+.ad-mobile-overlay{
+  display:none;
+}
+
+@media(max-width:1200px){
+  .ad-stats{
     grid-template-columns:repeat(2,1fr);
   }
 
-  .ea-dashboard-grid{
+  .ad-dashboard-grid{
     grid-template-columns:1fr;
   }
 
-  .ea-product-grid,
-  .ea-customer-grid{
+  .ad-product-grid,
+  .ad-customer-grid{
     grid-template-columns:repeat(2,1fr);
   }
 
-  .ea-coupon-grid{
+  .ad-coupon-grid{
     grid-template-columns:1fr;
   }
 }
 
-@media(max-width:900px){
-  .ea-sidebar{
+@media(max-width:950px){
+  .ad-sidebar{
     transform:translateX(-105%);
-    transition:.25s;
-    box-shadow:20px 0 50px rgba(0,0,0,.2);
+    transition:.25s ease;
+    box-shadow:25px 0 60px rgba(0,0,0,.22);
   }
 
-  .ea-sidebar.mobile-open{
+  .ad-sidebar.ad-sidebar-open{
     transform:translateX(0);
   }
 
-  .ea-overlay{
+  .ad-mobile-overlay{
     display:block;
     position:fixed;
-    z-index:45;
+    z-index:55;
     inset:0;
     border:0;
-    background:rgba(0,0,0,.4);
+    background:rgba(9,28,20,.5);
   }
 
-  .ea-main{
+  .ad-main{
     width:100%;
     margin-left:0;
   }
 
-  .ea-menu-btn{
+  .ad-menu-button{
     display:block;
   }
 
-  .ea-product-editor,
-  .ea-hero-card{
+  .ad-hero-card{
     grid-template-columns:1fr;
   }
 
-  .ea-hero-preview{
-    min-height:240px;
+  .ad-hero-preview{
+    min-height:280px;
   }
 
-  .ea-order-summary{
+  .ad-summary-grid{
     grid-template-columns:repeat(2,1fr);
+  }
+
+  .ad-login{
+    grid-template-columns:.9fr 1.1fr;
+  }
+
+  .ad-login-copy h1{
+    font-size:55px;
   }
 }
 
-@media(max-width:700px){
-  .ea-content{
+@media(max-width:760px){
+  .ad-content{
     padding:16px;
   }
 
-  .ea-header{
+  .ad-header{
     min-height:76px;
     padding:13px 16px;
   }
 
-  .ea-header h1{
-    font-size:18px;
-  }
-
-  .ea-header p{
+  .ad-header-kicker,
+  .ad-header p{
     display:none;
   }
 
-  .ea-header-user,
-  .desktop-shop{
+  .ad-header h1{
+    font-size:19px;
+  }
+
+  .ad-header-profile,
+  .ad-store-button{
     display:none;
   }
 
-  .ea-stats,
-  .ea-product-grid,
-  .ea-customer-grid,
-  .ea-review-grid,
-  .ea-category-grid,
-  .ea-mini-stats{
-    grid-template-columns:1fr;
-  }
-
-  .ea-toolbar{
+  .ad-toolbar{
     align-items:stretch;
     flex-direction:column;
   }
 
-  .ea-search{
+  .ad-search{
     max-width:none;
   }
 
-  .ea-select{
+  .ad-select{
     width:100%;
   }
 
-  .ea-form-grid,
-  .coupon-grid,
-  .ea-detail-grid{
+  .ad-product-grid,
+  .ad-customer-grid,
+  .ad-review-grid,
+  .ad-category-grid,
+  .ad-mini-stats{
     grid-template-columns:1fr;
   }
 
-  .ea-create-bar{
+  .ad-form-grid,
+  .ad-coupon-form,
+  .ad-two-col{
+    grid-template-columns:1fr;
+  }
+
+  .ad-create-category{
     grid-template-columns:1fr;
     align-items:stretch;
   }
 
-  .ea-order-summary{
-    grid-template-columns:1fr 1fr;
-  }
-
-  .ea-team-card{
-    align-items:flex-start;
+  .ad-team-member{
     flex-wrap:wrap;
   }
 
-  .ea-team-info{
+  .ad-team-info{
     min-width:calc(100% - 60px);
   }
 
-  .ea-team-controls{
+  .ad-team-actions{
     width:100%;
     flex-wrap:wrap;
   }
 
-  .ea-team-controls .ea-input{
+  .ad-team-actions .ad-select{
     width:100%;
   }
 
-  .ea-modal-bg{
-    padding:8px;
+  .ad-image-grid{
+    grid-template-columns:repeat(2,1fr);
   }
 
-  .ea-modal{
-    border-radius:14px;
-    max-height:95vh;
+  .ad-modal-backdrop{
+    padding:7px;
   }
 
-  .ea-modal-body{
-    padding:16px;
+  .ad-modal{
+    max-height:96vh;
+    border-radius:15px;
   }
 
-  .ea-product-editor{
-    gap:16px;
+  .ad-modal-content{
+    padding:15px;
+  }
+
+  .ad-login{
+    display:block;
+    min-height:100vh;
+  }
+
+  .ad-login-panel{
+    min-height:390px;
+    padding:100px 25px 35px;
+  }
+
+  .ad-login-brand{
+    left:25px;
+    top:25px;
+  }
+
+  .ad-login-copy{
+    margin-bottom:20px;
+  }
+
+  .ad-login-copy h1{
+    font-size:52px;
+  }
+
+  .ad-login-copy p{
+    font-size:9px;
+  }
+
+  .ad-login-feature{
+    display:none;
+  }
+
+  .ad-login-form-side{
+    padding:35px 20px 60px;
+  }
+
+  .ad-login-back{
+    top:28px;
+    right:20px;
+    color:#C7D2CC;
+  }
+
+  .ad-login-footer{
+    right:20px;
+    bottom:18px;
   }
 }
 
-@media(max-width:430px){
-  .ea-stats{
+@media(max-width:480px){
+  .ad-stats{
     grid-template-columns:1fr 1fr;
     gap:8px;
   }
 
-  .ea-stat{
+  .ad-stat{
+    min-height:145px;
     padding:13px;
   }
 
-  .ea-stat strong{
-    font-size:19px;
+  .ad-stat strong{
+    font-size:20px;
   }
 
-  .ea-stat-top{
-    margin-bottom:12px;
+  .ad-stat-icon{
+    width:34px;
+    height:34px;
   }
 
-  .ea-order-summary{
+  .ad-summary-grid{
     grid-template-columns:1fr;
   }
 
-  .ea-product-images{
+  .ad-section-intro{
+    align-items:flex-start;
+    flex-direction:column;
+  }
+
+  .ad-product-data{
     grid-template-columns:1fr 1fr;
   }
 
-  .ea-coupon-side{
+  .ad-coupon-strip{
     width:55px;
   }
 }
