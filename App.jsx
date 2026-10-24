@@ -40,7 +40,7 @@ const SLIDES = [
   { image: "https://loremflickr.com/1600/900/fashion?lock=204", l1: "স্টাইল যখন", l2: "আপনার পরিচয়", text: "Sneakers, jackets, bags and fragrances picked for the season.", cta: "Shop fashion", cat: "Fashion" },
   { image: "https://loremflickr.com/1600/900/camera?lock=205", l1: "প্রতিটি মুহূর্ত", l2: "ক্যামেরায় বন্দি করুন", text: "Mirrorless cameras and 4K drones for creators of every level.", cta: "Shop cameras", cat: "Cameras" },
 ];
-applyAdminCatalog(PRODUCTS, SLIDES, CATS); // products, categories, photos and hero slides saved in the admin panel
+applyAdminCatalog(PRODUCTS, CATS, SLIDES); // products, categories, photos and hero slides saved in the admin panel
 // Product photos: put them in  public/products/  named like  headphones.jpg  (main) and headphones-2.jpg, -3.jpg, -4.jpg (gallery).
 // Run  node get-images.mjs YOUR_PEXELS_KEY  to download matching photos automatically.
 // If a local photo is missing, a random online photo is used, and if that also fails the icon shows.
@@ -972,12 +972,23 @@ export default function App() {
   const [menu, setMenu] = useState(false);
   const [toast, setToast] = useState("");
   const [wish, setWish] = useState([]);
-  const [view, setView] = useState(() => (typeof window !== "undefined" && (window.location.hash === "#admin" || window.location.pathname === "/admin") ? "admin" : "shop"));
+  const [view, setView] = useState(() => (typeof window !== "undefined" && window.location.hash === "#admin") ? "admin" : "shop");
   useEffect(() => {
-    const go = () => { if (window.location.hash === "#admin" || window.location.pathname === "/admin") { setView("admin"); window.scrollTo(0, 0); } };
-    window.addEventListener("hashchange", go);
-    window.addEventListener("popstate", go);
-    return () => { window.removeEventListener("hashchange", go); window.removeEventListener("popstate", go); };
+    const syncRoute = () => {
+      if (window.location.hash === "#admin") {
+        setView("admin");
+        window.scrollTo(0, 0);
+      } else {
+        setView((current) => current === "admin" ? "shop" : current);
+      }
+    };
+    syncRoute();
+    window.addEventListener("hashchange", syncRoute);
+    window.addEventListener("popstate", syncRoute);
+    return () => {
+      window.removeEventListener("hashchange", syncRoute);
+      window.removeEventListener("popstate", syncRoute);
+    };
   }, []);
   const [si, setSi] = useState(0);
   const [paused, setPaused] = useState(false);
@@ -1012,7 +1023,7 @@ export default function App() {
     const h = a && a.getAttribute("href");
     if (!h || h[0] !== "#") return;
     e.preventDefault();
-    if (h === "#admin") { setView("admin"); window.scrollTo(0, 0); return; }
+    if (h === "#admin") { window.location.hash = "admin"; setView("admin"); window.scrollTo(0, 0); return; }
     setView("shop");
     setTimeout(() => (h === "#top" ? window.scrollTo({ top: 0, behavior: "smooth" }) : document.querySelector(h)?.scrollIntoView({ behavior: "smooth" })), 40);
   };
@@ -1120,7 +1131,7 @@ export default function App() {
           onBuy={(p, q) => { add(p, q); setView("checkout"); window.scrollTo(0, 0); }}
         />
       ) : view === "admin" ? (
-        <Admin products={PRODUCTS} cats={CATS} slides={SLIDES} onBack={() => { try { window.history.replaceState(null, "", "/"); } catch {} setView("shop"); window.scrollTo(0, 0); }} />
+        <Admin products={PRODUCTS} cats={CATS} slides={SLIDES} onBack={() => { try { window.history.replaceState(null, "", window.location.pathname + window.location.search); } catch {} setView("shop"); window.scrollTo(0, 0); }} />
       ) : view === "login" ? (
         <AuthPage onAuth={signIn} onBack={() => { setView("shop"); window.scrollTo(0, 0); }} />
       ) : view === "checkout" ? (
@@ -1267,7 +1278,7 @@ export default function App() {
             </div>
             <div><h4>Shop</h4><a href="#shop">Audio</a><a href="#shop">Wearables</a><a href="#shop">Fashion</a></div>
             <div><h4>Help</h4><a href="#contact">Shipping</a><a href="#contact">Returns</a><a href="#contact">Track order</a></div>
-            <div><h4>Company</h4><a href="#about">About us</a><a href="#contact">Careers</a><a href="#contact">hello@everstyle.store</a><a href="#admin">Admin</a></div>
+            <div><h4>Company</h4><a href="#about">About us</a><a href="#contact">Careers</a><a href="#contact">hello@everstyle.store</a></div>
           </div>
           <div className="copy"><span>© 2026 Ever Style. All rights reserved.</span><span>Privacy · Terms</span></div>
         </div>
